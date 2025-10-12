@@ -38,13 +38,6 @@ func (h *MyHandler) CreateShortUrl(rw http.ResponseWriter, req *http.Request) {
 		rw.Header().Set("content-type", "text/plain")
 		rw.WriteHeader(http.StatusCreated)
 		rw.Write([]byte(scheme + req.Host + req.URL.Path + token))
-
-		// Обновляем файл после каждого POST запроса
-		err = updateLinksStore(urls)
-		if err != nil {
-			http.Error(rw, "Error: "+err.Error(), http.StatusInternalServerError)
-			return
-		}
 	}
 }
 
