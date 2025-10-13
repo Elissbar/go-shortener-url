@@ -3,20 +3,30 @@ package handler
 import (
 	"io"
 	"net/http"
+	"strings"
 
+	"github.com/Elissbar/go-shortener-url/internal/config"
 	"github.com/go-chi/chi/v5"
 )
 
 type MyHandler struct {
-	Urls map[string]string
+	Urls   map[string]string
+	Config *config.Config
 }
 
 func (h *MyHandler) Router() chi.Router {
 	r := chi.NewRouter()
 	r.Post("/", h.CreateShortUrl)
 	r.Get("/{id}", h.GetShortUrl)
+	r.Get("/", h.GetRoot)
 
 	return r
+}
+
+func (h *MyHandler) GetRoot(rw http.ResponseWriter, req *http.Request) {
+	if req.Method == http.MethodGet {
+		rw.Write([]byte("URL Shortener is running!"))
+	}
 }
 
 func (h *MyHandler) CreateShortUrl(rw http.ResponseWriter, req *http.Request) {
@@ -38,14 +48,14 @@ func (h *MyHandler) CreateShortUrl(rw http.ResponseWriter, req *http.Request) {
 
 		h.Urls[token] = string(body)
 
-		scheme := "http://"
-		if req.TLS != nil {
-			scheme = "https://"
-		}
-
 		rw.Header().Set("content-type", "text/plain")
 		rw.WriteHeader(http.StatusCreated)
-		rw.Write([]byte(scheme + req.Host + req.URL.Path + token))
+
+		shortedUrl := h.Config.BaseUrl + token
+		if !strings.HasSuffix(h.Config.BaseUrl, "/") {
+			shortedUrl = h.Config.BaseUrl + "/" + token
+		}
+		rw.Write([]byte(shortedUrl))
 	}
 }
 

@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/Elissbar/go-shortener-url/internal/config"
 	"github.com/stretchr/testify/require"
 )
 
@@ -43,7 +44,10 @@ func TestCreateShortUrl(t *testing.T) {
 		w := httptest.NewRecorder()
 
 		urls := make(map[string]string)
-		myHandler := MyHandler{Urls: urls}
+		myHandler := MyHandler{
+			Urls: urls, 
+			Config: config.New("localhost:8080", "http://localhost:8080/"),
+		}
 
 		router := myHandler.Router()
 		router.ServeHTTP(w, request)
@@ -82,7 +86,10 @@ func TestGetShortUrl(t *testing.T) {
 	for _, tt := range tests {
 		urls := make(map[string]string)
 		urls[tt.id] = tt.redirectTo
-		myHandler := MyHandler{Urls: urls}
+		myHandler := MyHandler{
+			Urls: urls, 
+			Config: config.New("localhost:8080", "http://localhost:8080/"),
+		}
 
 		request := httptest.NewRequest(http.MethodGet, "/"+tt.id, nil)
 		w := httptest.NewRecorder()
