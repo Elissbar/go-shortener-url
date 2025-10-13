@@ -9,10 +9,10 @@ import (
 
 func main() {
 	parseFlags()
-	config := config.New(serverUrl, baseUrl)
+	cfg := config.New(serverUrl, baseUrl)
 
 	urls := make(map[string]string)
-	myHandler := handler.MyHandler{Urls: urls, Config: config}
+	myHandler := handler.MyHandler{Urls: urls, Config: cfg}
 
 	router := myHandler.Router()
 
