@@ -10,11 +10,9 @@ func main() {
 	urls := make(map[string]string)
 	myHandler := handler.MyHandler{Urls: urls}
 
-	mux := http.NewServeMux()
-	mux.HandleFunc("/", myHandler.CreateShortUrl)
-	mux.HandleFunc("/{id}", myHandler.GetShortUrl)
+	router := myHandler.Router()
 
-	err := http.ListenAndServe(":8080", mux)
+	err := http.ListenAndServe(":8080", router)
 	if err != nil {
 		panic(err)
 	}

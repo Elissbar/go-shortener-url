@@ -44,12 +44,14 @@ func TestCreateShortUrl(t *testing.T) {
 
 		urls := make(map[string]string)
 		myHandler := MyHandler{Urls: urls}
-		myHandler.CreateShortUrl(w, request)
+
+		router := myHandler.Router()
+		router.ServeHTTP(w, request)
 
 		result := w.Result()
 
-		require.Equal(t, result.StatusCode, tt.want.statusCode)
-		require.Equal(t, result.Header.Get("Content-Type"), tt.want.contentType)
+		require.Equal(t, tt.want.statusCode, result.StatusCode)
+		require.Equal(t, tt.want.contentType, result.Header.Get("Content-Type"))
 	}
 }
 
@@ -80,17 +82,18 @@ func TestGetShortUrl(t *testing.T) {
 	for _, tt := range tests {
 		urls := make(map[string]string)
 		urls[tt.id] = tt.redirectTo
+		myHandler := MyHandler{Urls: urls}
 
 		request := httptest.NewRequest(http.MethodGet, "/"+tt.id, nil)
 		w := httptest.NewRecorder()
 
-		myHandler := MyHandler{Urls: urls}
-		myHandler.GetShortUrl(w, request)
+		router := myHandler.Router()
+		router.ServeHTTP(w, request)
 
 		result := w.Result()
 		redirectedTo, _ := result.Location()
 
-		require.Equal(t, result.StatusCode, tt.expectedStatusCode)
-		require.Equal(t, redirectedTo.String(), tt.redirectTo)
+		require.Equal(t, tt.expectedStatusCode, result.StatusCode)
+		require.Equal(t, tt.redirectTo, redirectedTo.String())
 	}
 }

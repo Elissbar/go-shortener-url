@@ -3,22 +3,30 @@ package handler
 import (
 	"io"
 	"net/http"
+
+	"github.com/go-chi/chi/v5"
 )
 
 type MyHandler struct {
 	Urls map[string]string
 }
 
+func (h *MyHandler) Router() chi.Router {
+	r := chi.NewRouter()
+	r.Post("/", h.CreateShortUrl)
+	r.Get("/{id}", h.GetShortUrl)
+
+	return r
+}
+
 func (h *MyHandler) CreateShortUrl(rw http.ResponseWriter, req *http.Request) {
 	if req.Method == http.MethodPost {
-		urls := h.Urls
-
 		token, err := generateToken()
 		if err != nil {
 			http.Error(rw, "Error: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
-		for _, ok := urls[token]; ok; { // Если такой токен уже есть - генерируем новый
+		for _, ok := h.Urls[token]; ok; { // Если такой токен уже есть - генерируем новый
 			token, _ = generateToken()
 		}
 
@@ -28,7 +36,7 @@ func (h *MyHandler) CreateShortUrl(rw http.ResponseWriter, req *http.Request) {
 			return
 		}
 
-		urls[token] = string(body)
+		h.Urls[token] = string(body)
 
 		scheme := "http://"
 		if req.TLS != nil {
@@ -43,8 +51,8 @@ func (h *MyHandler) CreateShortUrl(rw http.ResponseWriter, req *http.Request) {
 
 func (h *MyHandler) GetShortUrl(rw http.ResponseWriter, req *http.Request) {
 	if req.Method == http.MethodGet {
-		urls := h.Urls
-		url, ok := urls[req.URL.Path[1:]]
+		id := chi.URLParam(req, "id")
+		url, ok := h.Urls[id]
 		if !ok {
 			rw.WriteHeader(http.StatusNotFound)
 			rw.Write([]byte("Not Found"))
