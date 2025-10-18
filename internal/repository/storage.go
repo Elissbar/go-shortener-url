@@ -6,7 +6,7 @@ import (
 
 type Storage interface {
 	Save(token, url string)
-	Get(token string) (string, error)
+	Get(token string) (string, bool)
 }
 
 type MemoryStorage struct {
