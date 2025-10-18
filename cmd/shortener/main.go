@@ -3,20 +3,18 @@ package main
 import (
 	"net/http"
 
-	"github.com/Elissbar/go-shortener-url/internal/config"
 	"github.com/Elissbar/go-shortener-url/internal/handler"
+	"github.com/Elissbar/go-shortener-url/internal/repository"
 )
 
 func main() {
-	parseFlags()
-	cfg := config.New(serverUrl, baseUrl)
+	cfg := parseFlags()
 
-	urls := make(map[string]string)
-	myHandler := handler.MyHandler{Urls: urls, Config: cfg}
+	myHandler := handler.MyHandler{Storage: repository.MemoryStorage{}, Config: cfg}
 
 	router := myHandler.Router()
 
-	err := http.ListenAndServe(serverUrl, router)
+	err := http.ListenAndServe(cfg.ServerURL, router)
 	if err != nil {
 		panic(err)
 	}

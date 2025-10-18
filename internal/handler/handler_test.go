@@ -4,9 +4,11 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/Elissbar/go-shortener-url/internal/config"
+	"github.com/Elissbar/go-shortener-url/internal/repository"
 	"github.com/stretchr/testify/require"
 )
 
@@ -43,10 +45,9 @@ func TestCreateShortUrl(t *testing.T) {
 		request := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(tt.request))
 		w := httptest.NewRecorder()
 
-		urls := make(map[string]string)
 		myHandler := MyHandler{
-			Urls: urls, 
-			Config: config.New("localhost:8080", "http://localhost:8080/"),
+			Storage: repository.MemoryStorage{},
+			Config:  config.New("localhost:8080", "http://localhost:8080/"),
 		}
 
 		router := myHandler.Router()
@@ -84,11 +85,11 @@ func TestGetShortUrl(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		urls := make(map[string]string)
-		urls[tt.id] = tt.redirectTo
+		urls := sync.Map{}
+		urls.Store(tt.id, tt.redirectTo)
 		myHandler := MyHandler{
-			Urls: urls, 
-			Config: config.New("localhost:8080", "http://localhost:8080/"),
+			Storage: repository.MemoryStorage{Urls: urls},
+			Config:  config.New("localhost:8080", "http://localhost:8080/"),
 		}
 
 		request := httptest.NewRequest(http.MethodGet, "/"+tt.id, nil)

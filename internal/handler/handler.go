@@ -6,12 +6,13 @@ import (
 	"strings"
 
 	"github.com/Elissbar/go-shortener-url/internal/config"
+	"github.com/Elissbar/go-shortener-url/internal/repository"
 	"github.com/go-chi/chi/v5"
 )
 
 type MyHandler struct {
-	Urls   map[string]string
-	Config *config.Config
+	Storage repository.MemoryStorage
+	Config  *config.Config
 }
 
 func (h *MyHandler) Router() chi.Router {
@@ -36,7 +37,7 @@ func (h *MyHandler) CreateShortUrl(rw http.ResponseWriter, req *http.Request) {
 			http.Error(rw, "Error: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
-		for _, ok := h.Urls[token]; ok; { // Если такой токен уже есть - генерируем новый
+		for _, ok := h.Storage.Get(token); ok; { // Если такой токен уже есть - генерируем новый
 			token, _ = generateToken()
 		}
 
@@ -46,14 +47,14 @@ func (h *MyHandler) CreateShortUrl(rw http.ResponseWriter, req *http.Request) {
 			return
 		}
 
-		h.Urls[token] = string(body)
+		h.Storage.Save(token, string(body))
 
 		rw.Header().Set("content-type", "text/plain")
 		rw.WriteHeader(http.StatusCreated)
 
-		shortedUrl := h.Config.BaseUrl + token
-		if !strings.HasSuffix(h.Config.BaseUrl, "/") {
-			shortedUrl = h.Config.BaseUrl + "/" + token
+		shortedUrl := h.Config.BaseURL + token
+		if !strings.HasSuffix(h.Config.BaseURL, "/") {
+			shortedUrl = h.Config.BaseURL + "/" + token
 		}
 		rw.Write([]byte(shortedUrl))
 	}
@@ -62,7 +63,7 @@ func (h *MyHandler) CreateShortUrl(rw http.ResponseWriter, req *http.Request) {
 func (h *MyHandler) GetShortUrl(rw http.ResponseWriter, req *http.Request) {
 	if req.Method == http.MethodGet {
 		id := chi.URLParam(req, "id")
-		url, ok := h.Urls[id]
+		url, ok := h.Storage.Get(id)
 		if !ok {
 			rw.WriteHeader(http.StatusNotFound)
 			rw.Write([]byte("Not Found"))
