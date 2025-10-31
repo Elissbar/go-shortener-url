@@ -3,14 +3,35 @@ package handler
 import (
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"sync"
 	"testing"
 
 	"github.com/Elissbar/go-shortener-url/internal/config"
+	"github.com/Elissbar/go-shortener-url/internal/logger"
 	"github.com/Elissbar/go-shortener-url/internal/repository"
 	"github.com/stretchr/testify/require"
 )
+
+var myHandler MyHandler
+
+func TestMain(m *testing.M) {
+	cfg := config.New("localhost:8080", "http://localhost:8080/", "info")
+
+	if err := logger.Initialize(cfg.LogLevel); err != nil {
+		panic(err)
+	}
+
+	myHandler = MyHandler{
+		Storage: &repository.MemoryStorage{},
+		Config:  cfg,
+		Logger:  logger.Log.Sugar(),
+	}
+
+	code := m.Run()
+	os.Exit(code)
+}
 
 func TestCreateShortUrl(t *testing.T) {
 	type want struct {
@@ -44,11 +65,6 @@ func TestCreateShortUrl(t *testing.T) {
 	for _, tt := range tests {
 		request := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(tt.request))
 		w := httptest.NewRecorder()
-
-		myHandler := MyHandler{
-			Storage: repository.MemoryStorage{},
-			Config:  config.New("localhost:8080", "http://localhost:8080/"),
-		}
 
 		router := myHandler.Router()
 		router.ServeHTTP(w, request)
@@ -87,10 +103,7 @@ func TestGetShortUrl(t *testing.T) {
 	for _, tt := range tests {
 		urls := sync.Map{}
 		urls.Store(tt.id, tt.redirectTo)
-		myHandler := MyHandler{
-			Storage: repository.MemoryStorage{Urls: urls},
-			Config:  config.New("localhost:8080", "http://localhost:8080/"),
-		}
+		myHandler.Storage = &repository.MemoryStorage{Urls: urls}
 
 		request := httptest.NewRequest(http.MethodGet, "/"+tt.id, nil)
 		w := httptest.NewRecorder()

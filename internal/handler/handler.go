@@ -8,15 +8,19 @@ import (
 	"github.com/Elissbar/go-shortener-url/internal/config"
 	"github.com/Elissbar/go-shortener-url/internal/repository"
 	"github.com/go-chi/chi/v5"
+	"go.uber.org/zap"
 )
 
 type MyHandler struct {
-	Storage repository.MemoryStorage
+	Storage repository.Storage
 	Config  *config.Config
+	Logger  *zap.SugaredLogger
 }
 
 func (h *MyHandler) Router() chi.Router {
 	r := chi.NewRouter()
+
+	r.Use(h.LoggingMiddleware)
 	r.Post("/", h.CreateShortUrl)
 	r.Get("/{id}", h.GetShortUrl)
 	r.Get("/", h.GetRoot)

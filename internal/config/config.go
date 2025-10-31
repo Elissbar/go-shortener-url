@@ -1,13 +1,13 @@
 package config
 
 type Config struct {
-	ServerURL  string
-	BaseURL   string
+	ServerURL, BaseURL, LogLevel string
 }
 
-func New(serverURL, baseURL string) *Config {
+func New(serverURL, baseURL, logLevel string) *Config {
 	return &Config{
 		ServerURL:  serverURL,
 		BaseURL:    baseURL,
+		LogLevel: logLevel,
 	}
 }
