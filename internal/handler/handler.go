@@ -23,6 +23,9 @@ func (h *MyHandler) Router() chi.Router {
 	r := chi.NewRouter()
 
 	r.Use(h.LoggingMiddleware)
+	r.Use(ungzipMiddleware)
+    r.Use(gzipMiddleware)
+
 	r.Post("/", h.CreateShortUrl)
 	r.Post("/api/shorten", h.CreateShortUrlJSON)
 	r.Get("/{id}", h.GetShortUrl)
