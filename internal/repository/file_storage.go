@@ -3,6 +3,7 @@ package repository
 import (
 	"encoding/json"
 	"os"
+	"strconv"
 	"sync"
 
 	"github.com/Elissbar/go-shortener-url/internal/model"
@@ -79,7 +80,7 @@ func (fs *FileStorage) saveToFile() error {
 	i := 1
 	for shortURL, originalURL := range fs.data {
 		records = append(records, model.URLRecord{
-			UUID:        string(i),
+			UUID:        strconv.Itoa(i),
 			ShortURL:    shortURL,
 			OriginalURL: originalURL,
 		})
