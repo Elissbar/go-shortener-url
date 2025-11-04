@@ -39,12 +39,10 @@ func (h *MyHandler) GetRoot(rw http.ResponseWriter, req *http.Request) {
 
 func (h *MyHandler) CreateShortUrlJSON(rw http.ResponseWriter, req *http.Request) {
 	if req.Method == http.MethodPost {
-		rw.Header().Set("Сontent-Type", "application/json")
-
 		token, err := generateToken()
 		if err != nil {
 			http.Error(rw, "Error: "+err.Error(), http.StatusInternalServerError)
-			json.NewEncoder(rw).Encode(map[string]string{"error": "invalid JSON"})
+			json.NewEncoder(rw).Encode(map[string]string{"error": err.Error()})
 			return
 		}
 		for _, ok := h.Storage.Get(token); ok; { // Если такой токен уже есть - генерируем новый
@@ -53,7 +51,6 @@ func (h *MyHandler) CreateShortUrlJSON(rw http.ResponseWriter, req *http.Request
 
 		var rq model.Request
 		dec := json.NewDecoder(req.Body)
-
 		if err := dec.Decode(&rq); err != nil {
 			http.Error(rw, "Error: "+err.Error(), http.StatusInternalServerError)
 			json.NewEncoder(rw).Encode(map[string]string{"error": "invalid JSON"})
@@ -68,14 +65,14 @@ func (h *MyHandler) CreateShortUrlJSON(rw http.ResponseWriter, req *http.Request
 			resp.Result = h.Config.BaseURL + "/" + token
 		}
 
+		rw.Header().Set("Content-Type", "application/json")
 		rw.WriteHeader(http.StatusCreated)
-
+		
 		enc := json.NewEncoder(rw)
 		if err := enc.Encode(resp); err != nil {
 			http.Error(rw, "Error: "+err.Error(), http.StatusInternalServerError)
-			json.NewEncoder(rw).Encode(map[string]string{"error": "invalid JSON"})
 			return
-		}
+		}		
 	}
 }
 

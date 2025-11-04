@@ -1,6 +1,9 @@
 package handler
 
 import (
+	"encoding/json"
+	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -10,6 +13,7 @@ import (
 
 	"github.com/Elissbar/go-shortener-url/internal/config"
 	"github.com/Elissbar/go-shortener-url/internal/logger"
+	"github.com/Elissbar/go-shortener-url/internal/model"
 	"github.com/Elissbar/go-shortener-url/internal/repository"
 	"github.com/stretchr/testify/require"
 )
@@ -116,5 +120,62 @@ func TestGetShortUrl(t *testing.T) {
 
 		require.Equal(t, tt.expectedStatusCode, result.StatusCode)
 		require.Equal(t, tt.redirectTo, redirectedTo.String())
+	}
+}
+
+func TestCreateShortUrlJSON(t *testing.T) {
+	type want struct {
+		contentType string
+		statusCode  int
+	}
+
+	tests := []struct {
+		name    string
+		request string
+		want    want
+	}{
+		{
+			name:    "Create short url",
+			request: "https://practicum.yandex.ru/",
+			want: want{
+				contentType: "application/json",
+				statusCode:  http.StatusCreated,
+			},
+		},
+		{
+			name:    "Create short url 2",
+			request: "https://www.google.com/",
+			want: want{
+				contentType: "application/json",
+				statusCode:  http.StatusCreated,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		data := map[string]string{}
+		data["url"] = tt.request
+
+		modifiedJSONBytes, err := json.Marshal(data)
+		if err != nil {
+			fmt.Println("Error marshaling JSON:", err)
+			return
+		}
+
+		request := httptest.NewRequest(http.MethodPost, "/api/shorten", strings.NewReader(string(modifiedJSONBytes)))
+		w := httptest.NewRecorder()
+
+		router := myHandler.Router()
+		router.ServeHTTP(w, request)
+
+		result := w.Result()
+
+		body, _ := io.ReadAll(result.Body)
+		var resp model.Response
+		json.Unmarshal(body, &resp)
+
+		require.Equal(t, tt.want.statusCode, result.StatusCode)
+		require.Equal(t, tt.want.contentType, result.Header.Get("Content-Type"))
+		require.NotEmpty(t, resp.Result, "Result should not be empty")
 	}
 }

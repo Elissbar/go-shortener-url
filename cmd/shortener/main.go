@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"net/http"
 
 	"github.com/Elissbar/go-shortener-url/internal/handler"
@@ -12,7 +11,7 @@ import (
 func main() {
 	cfg := parseFlags()
 	if err := logger.Initialize(cfg.LogLevel); err != nil {
-		fmt.Errorf("Error: %v", err)
+		panic(err)
 	}
 
 	myHandler := handler.MyHandler{Storage: &repository.MemoryStorage{}, Config: cfg, Logger: logger.Log.Sugar()}
