@@ -21,7 +21,7 @@ import (
 var myHandler MyHandler
 
 func TestMain(m *testing.M) {
-	cfg := config.New("localhost:8080", "http://localhost:8080/", "info")
+	cfg := &config.Config{"localhost:8080", "http://localhost:8080/", "info", ""}
 
 	if err := logger.Initialize(cfg.LogLevel); err != nil {
 		panic(err)

@@ -10,11 +10,30 @@ import (
 
 func main() {
 	cfg := parseFlags()
+
 	if err := logger.Initialize(cfg.LogLevel); err != nil {
 		panic(err)
 	}
+	log := logger.Log.Sugar()
 
-	myHandler := handler.MyHandler{Storage: &repository.MemoryStorage{}, Config: cfg, Logger: logger.Log.Sugar()}
+	// Выбираем хранилище в зависимости от конфигурации
+    var storage repository.Storage
+    if cfg.FileStoragePath != "" {
+        var err error
+        storage, err = repository.NewFileStorage(cfg.FileStoragePath)
+        if err != nil {
+            log.Fatal("Failed to create file storage:", err)
+        }
+        defer storage.(*repository.FileStorage).Close()
+    } else {
+        storage = &repository.MemoryStorage{}
+    }
+
+	myHandler := &handler.MyHandler{
+		Storage: storage, 
+		Config: cfg, 
+		Logger: log,
+	}
 
 	router := myHandler.Router()
 
