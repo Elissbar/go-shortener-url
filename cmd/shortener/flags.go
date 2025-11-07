@@ -7,7 +7,7 @@ import (
 	"github.com/Elissbar/go-shortener-url/internal/config"
 )
 
-func parseFlags() *config.Config {
+func parseFlags() (*config.Config, error) {
 	cfg := &config.Config{}
 
 	flag.StringVar(&cfg.ServerURL, "a", "localhost:8080", "<host>:<port>")
@@ -29,5 +29,5 @@ func parseFlags() *config.Config {
 		cfg.FileStoragePath = envPath
 	}
 
-	return cfg
+	return cfg, nil
 }

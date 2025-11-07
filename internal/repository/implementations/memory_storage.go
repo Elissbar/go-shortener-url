@@ -19,3 +19,5 @@ func (ms *MemoryStorage) Get(token string) (string, bool) {
 	return val.(string), true
 }
 
+func (ms *MemoryStorage) Close() error {return nil}
+

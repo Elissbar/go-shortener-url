@@ -9,7 +9,10 @@ import (
 )
 
 func main() {
-	cfg := parseFlags()
+	cfg, err := parseFlags()
+	if err != nil {
+		panic(err)
+	}
 
 	log, err := logger.NewSugaredLogger(cfg.LogLevel)
 	if err != nil {
@@ -21,6 +24,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	defer storage.Close()
 
 	myHandler := &handler.MyHandler{
 		Storage: storage,

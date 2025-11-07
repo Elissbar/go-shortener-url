@@ -2,7 +2,6 @@ package handler
 
 import (
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -160,7 +159,6 @@ func TestCreateShortUrlJSON(t *testing.T) {
 
 		modifiedJSONBytes, err := json.Marshal(data)
 		if err != nil {
-			fmt.Println("Error marshaling JSON:", err)
 			return
 		}
 
