@@ -13,7 +13,7 @@ func parseFlags() *config.Config {
 	flag.StringVar(&cfg.ServerURL, "a", "localhost:8080", "<host>:<port>")
 	flag.StringVar(&cfg.BaseURL, "b", "http://localhost:8080/", "Base URL for the API. Example: http://localhost:8080/")
 	flag.StringVar(&cfg.LogLevel, "l", "info", "Log level. Example: info, debug, error")
-	flag.StringVar(&cfg.FileStoragePath, "f", "", "File storage path")
+	flag.StringVar(&cfg.FileStoragePath, "f", "links.json", "File storage path")
 	flag.Parse()
 
 	if osEnvServerAddr := os.Getenv("SERVER_ADDRESS"); osEnvServerAddr != "" {
