@@ -42,21 +42,16 @@ func (h *MyHandler) GetRoot(rw http.ResponseWriter, req *http.Request) {
 
 func (h *MyHandler) CreateShortUrlJSON(rw http.ResponseWriter, req *http.Request) {
 	if req.Method == http.MethodPost {
-		token, err := generateToken()
+		token, err := getToken(h.Storage)
 		if err != nil {
 			http.Error(rw, "Error: "+err.Error(), http.StatusInternalServerError)
-			json.NewEncoder(rw).Encode(map[string]string{"error": err.Error()})
 			return
-		}
-		for _, ok := h.Storage.Get(token); ok; { // Если такой токен уже есть - генерируем новый
-			token, _ = generateToken()
 		}
 
 		var rq model.Request
 		dec := json.NewDecoder(req.Body)
 		if err := dec.Decode(&rq); err != nil {
 			http.Error(rw, "Error: "+err.Error(), http.StatusInternalServerError)
-			json.NewEncoder(rw).Encode(map[string]string{"error": "invalid JSON"})
 			return
 		}
 

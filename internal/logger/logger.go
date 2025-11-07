@@ -1,25 +1,23 @@
 package logger
 
-import (
-	"go.uber.org/zap"
-)
+import "go.uber.org/zap"
 
-var Log *zap.Logger = zap.NewNop()
+func NewLogger(logLevel string) (*zap.Logger, error) {
+    lvl, err := zap.ParseAtomicLevel(logLevel)
+    if err != nil {
+        return zap.NewNop(), err
+    }
 
-func Initialize(logLevel string) error {
-	lvl, err := zap.ParseAtomicLevel(logLevel)
-	if err != nil {
-		return nil
-	}
+    cfg := zap.NewProductionConfig()
+    cfg.Level = lvl
 
-	cfg := zap.NewProductionConfig()
-	cfg.Level = lvl
+    return cfg.Build()
+}
 
-	zl, err := cfg.Build()
-	if err != nil {
-		return err
-	}
-	
-	Log = zl
-	return nil
+func NewSugaredLogger(logLevel string) (*zap.SugaredLogger, error) {
+    logger, err := NewLogger(logLevel)
+    if err != nil {
+        return logger.Sugar(), err
+    }
+    return logger.Sugar(), nil
 }

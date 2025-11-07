@@ -1,4 +1,4 @@
-package repository
+package implementations
 
 import "sync"
 
@@ -18,3 +18,4 @@ func (ms *MemoryStorage) Get(token string) (string, bool) {
 	}
 	return val.(string), true
 }
+

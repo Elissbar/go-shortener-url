@@ -14,7 +14,7 @@ import (
 	"github.com/Elissbar/go-shortener-url/internal/config"
 	"github.com/Elissbar/go-shortener-url/internal/logger"
 	"github.com/Elissbar/go-shortener-url/internal/model"
-	"github.com/Elissbar/go-shortener-url/internal/repository"
+	"github.com/Elissbar/go-shortener-url/internal/repository/implementations"
 	"github.com/stretchr/testify/require"
 )
 
@@ -23,14 +23,16 @@ var myHandler MyHandler
 func TestMain(m *testing.M) {
 	cfg := &config.Config{"localhost:8080", "http://localhost:8080/", "info", ""}
 
-	if err := logger.Initialize(cfg.LogLevel); err != nil {
+	log, err := logger.NewSugaredLogger(cfg.LogLevel)
+	if err != nil {
 		panic(err)
 	}
+	defer log.Sync()
 
 	myHandler = MyHandler{
-		Storage: &repository.MemoryStorage{},
+		Storage: &implementations.MemoryStorage{},
 		Config:  cfg,
-		Logger:  logger.Log.Sugar(),
+		Logger:  log,
 	}
 
 	code := m.Run()
@@ -107,7 +109,7 @@ func TestGetShortUrl(t *testing.T) {
 	for _, tt := range tests {
 		urls := sync.Map{}
 		urls.Store(tt.id, tt.redirectTo)
-		myHandler.Storage = &repository.MemoryStorage{Urls: urls}
+		myHandler.Storage = &implementations.MemoryStorage{Urls: urls}
 
 		request := httptest.NewRequest(http.MethodGet, "/"+tt.id, nil)
 		w := httptest.NewRecorder()
