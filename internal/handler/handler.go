@@ -1,23 +1,33 @@
 package handler
 
 import (
+	"encoding/json"
 	"io"
 	"net/http"
 	"strings"
 
 	"github.com/Elissbar/go-shortener-url/internal/config"
+	"github.com/Elissbar/go-shortener-url/internal/model"
 	"github.com/Elissbar/go-shortener-url/internal/repository"
 	"github.com/go-chi/chi/v5"
+	"go.uber.org/zap"
 )
 
 type MyHandler struct {
-	Storage repository.MemoryStorage
+	Storage repository.Storage
 	Config  *config.Config
+	Logger  *zap.SugaredLogger
 }
 
 func (h *MyHandler) Router() chi.Router {
 	r := chi.NewRouter()
+
+	r.Use(h.LoggingMiddleware)
+	r.Use(ungzipMiddleware)
+    r.Use(gzipMiddleware)
+
 	r.Post("/", h.CreateShortUrl)
+	r.Post("/api/shorten", h.CreateShortUrlJSON)
 	r.Get("/{id}", h.GetShortUrl)
 	r.Get("/", h.GetRoot)
 
@@ -27,6 +37,40 @@ func (h *MyHandler) Router() chi.Router {
 func (h *MyHandler) GetRoot(rw http.ResponseWriter, req *http.Request) {
 	if req.Method == http.MethodGet {
 		rw.Write([]byte("URL Shortener is running!"))
+	}
+}
+
+func (h *MyHandler) CreateShortUrlJSON(rw http.ResponseWriter, req *http.Request) {
+	if req.Method == http.MethodPost {
+		token, err := getToken(h.Storage)
+		if err != nil {
+			http.Error(rw, "Error: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		var rq model.Request
+		dec := json.NewDecoder(req.Body)
+		if err := dec.Decode(&rq); err != nil {
+			http.Error(rw, "Error: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		h.Storage.Save(token, rq.URL)
+
+		var resp model.Response
+		resp.Result = h.Config.BaseURL + token
+		if !strings.HasSuffix(h.Config.BaseURL, "/") {
+			resp.Result = h.Config.BaseURL + "/" + token
+		}
+
+		rw.Header().Set("Content-Type", "application/json")
+		rw.WriteHeader(http.StatusCreated)
+		
+		enc := json.NewEncoder(rw)
+		if err := enc.Encode(resp); err != nil {
+			http.Error(rw, "Error: "+err.Error(), http.StatusInternalServerError)
+			return
+		}		
 	}
 }
 

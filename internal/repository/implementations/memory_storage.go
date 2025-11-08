@@ -1,20 +1,14 @@
-package repository
+package implementations
 
-import (
-	"sync"
-)
-
-type Storage interface {
-	Save(token, url string)
-	Get(token string) (string, bool)
-}
+import "sync"
 
 type MemoryStorage struct {
 	Urls sync.Map
 }
 
-func (ms *MemoryStorage) Save(token, url string) {
+func (ms *MemoryStorage) Save(token, url string) error {
 	ms.Urls.Store(token, url)
+	return nil
 }
 
 func (ms *MemoryStorage) Get(token string) (string, bool) {
@@ -24,3 +18,6 @@ func (ms *MemoryStorage) Get(token string) (string, bool) {
 	}
 	return val.(string), true
 }
+
+func (ms *MemoryStorage) Close() error {return nil}
+
