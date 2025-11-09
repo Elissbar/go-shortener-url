@@ -9,6 +9,7 @@ import (
 	"github.com/Elissbar/go-shortener-url/internal/config"
 	"github.com/Elissbar/go-shortener-url/internal/model"
 	"github.com/Elissbar/go-shortener-url/internal/repository"
+	databasestorage "github.com/Elissbar/go-shortener-url/internal/repository/implementations/database_storage"
 	"github.com/go-chi/chi/v5"
 	"go.uber.org/zap"
 )
@@ -30,6 +31,7 @@ func (h *MyHandler) Router() chi.Router {
 	r.Post("/api/shorten", h.CreateShortUrlJSON)
 	r.Get("/{id}", h.GetShortUrl)
 	r.Get("/", h.GetRoot)
+	r.Get("/ping", h.CheckConnectionDB)
 
 	return r
 }
@@ -114,5 +116,18 @@ func (h *MyHandler) GetShortUrl(rw http.ResponseWriter, req *http.Request) {
 		} else {
 			http.Redirect(rw, req, url, http.StatusTemporaryRedirect)
 		}
+	}
+}
+
+func (h *MyHandler) CheckConnectionDB(rw http.ResponseWriter, req *http.Request) {
+	if db, ok := h.Storage.(*databasestorage.DBStorage); ok {
+		err := db.DB.Ping()
+		if err != nil {
+			rw.WriteHeader(http.StatusInternalServerError)
+			rw.Write([]byte("Database connection is not success"))
+			return
+		}
+		rw.WriteHeader(http.StatusOK)
+		rw.Write([]byte("Database connection is success"))
 	}
 }

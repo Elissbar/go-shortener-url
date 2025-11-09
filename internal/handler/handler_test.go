@@ -20,7 +20,11 @@ import (
 var myHandler MyHandler
 
 func TestMain(m *testing.M) {
-	cfg := &config.Config{"localhost:8080", "http://localhost:8080/", "info", ""}
+	cfg := &config.Config{
+		ServerURL: "localhost:8080", 
+		BaseURL: "http://localhost:8080/", 
+		LogLevel: "info",
+	}
 
 	log, err := logger.NewSugaredLogger(cfg.LogLevel)
 	if err != nil {

@@ -14,6 +14,7 @@ func parseFlags() (*config.Config, error) {
 	flag.StringVar(&cfg.BaseURL, "b", "http://localhost:8080/", "Base URL for the API. Example: http://localhost:8080/")
 	flag.StringVar(&cfg.LogLevel, "l", "info", "Log level. Example: info, debug, error")
 	flag.StringVar(&cfg.FileStoragePath, "f", "/tmp/links.json", "File storage path")
+	flag.StringVar(&cfg.DatabaseAdr, "d", "localhost:postgres:12345:shortener", "File storage path")
 	flag.Parse()
 
 	if osEnvServerAddr := os.Getenv("SERVER_ADDRESS"); osEnvServerAddr != "" {
@@ -27,6 +28,9 @@ func parseFlags() (*config.Config, error) {
 	}
 	if envPath := os.Getenv("FILE_STORAGE_PATH"); envPath != "" {
 		cfg.FileStoragePath = envPath
+	}
+	if dbAdr := os.Getenv("DATABASE_DSN"); dbAdr != "" {
+		cfg.DatabaseAdr = dbAdr
 	}
 
 	return cfg, nil
