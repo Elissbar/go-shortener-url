@@ -1,6 +1,7 @@
 package filestorage
 
 import (
+	"context"
 	"os"
 	"strconv"
 
@@ -41,12 +42,12 @@ func NewFileStorage(fm *FileManager, sr Serializer) (*FileStorage, error) {
 	return fs, nil
 }
 
-func (fs *FileStorage) Save(token, url string) error {
+func (fs *FileStorage) Save(ctx context.Context, token, url string) error {
 	fs.cache.Save(token, url)
 	return nil
 }
 
-func (fs *FileStorage) Get(token string) (string, bool) {
+func (fs *FileStorage) Get(ctx context.Context, token string) (string, bool) {
 	return fs.cache.Get(token)
 }
 

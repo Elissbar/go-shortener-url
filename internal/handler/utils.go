@@ -1,18 +1,19 @@
 package handler
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/base64"
 
 	"github.com/Elissbar/go-shortener-url/internal/repository"
 )
 
-func getToken(storage repository.Storage) (string, error) {
+func getToken(ctx context.Context, storage repository.Storage) (string, error) {
 	token, err := generateToken()
 	if err != nil {
 		return "", err
 	}
-	for _, ok := storage.Get(token); ok; { // Если такой токен уже есть - генерируем новый
+	for _, ok := storage.Get(ctx, token); ok; { // Если такой токен уже есть - генерируем новый
 		token, _ = generateToken()
 	}
 	return token, nil

@@ -1,32 +1,72 @@
 package databasestorage
 
 import (
+	"context"
 	"database/sql"
-	"fmt"
-	"strings"
 
+	"github.com/golang-migrate/migrate/v4"
+	"github.com/golang-migrate/migrate/v4/database/postgres"
+	_ "github.com/golang-migrate/migrate/v4/source/file"
 	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
 type DBStorage struct {
 	DB *sql.DB
+	connectionData string
 }
 
 func NewDatabaseStorage(connectionData string) (*DBStorage, error) {
-	data := strings.Split(connectionData, ":")
-	ps := fmt.Sprintf("host=%s user=%s password=%s dbname=%s sslmode=disable", data[0], data[1], data[2], data[3])
-
-	db, err := sql.Open("pgx", ps)
+	db, err := sql.Open("pgx", connectionData)
+	storage := &DBStorage{db, connectionData}
 	if err != nil {
 		return nil, err
 	}
-	storage := &DBStorage{DB: db}
+
+	err = storage.Migrate()
+	if err != nil {
+		return nil, err
+	}
+
 	return storage, nil
 }
 
-func (db *DBStorage) Save(token, url string) error { return nil }
+func (db *DBStorage) Migrate() error {
+	driver, err := postgres.WithInstance(db.DB, &postgres.Config{})
+	if err != nil {
+		return err
+	}
+	m, err := migrate.NewWithDatabaseInstance(
+		"file://migrations",
+		"postgres",
+		driver,
+	)
+	if err != nil {
+		return err
+	}
+	if err = m.Up(); err != nil && err != migrate.ErrNoChange {
+		return err
+	}
+	return nil
+}
 
-func (db *DBStorage) Get(token string) (string, bool) { return "", false }
+func (db *DBStorage) Save(ctx context.Context, token, url string) error {
+	_, err := db.DB.ExecContext(ctx, "INSERT INTO shorted_links (token, url) VALUES ($1, $2)", token, url)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (db *DBStorage) Get(ctx context.Context, token string) (string, bool) {
+	row := db.DB.QueryRowContext(ctx, "SELECT url FROM shorted_links WHERE token = $1", token)
+
+	var value string
+	err := row.Scan(&value)
+	if err != nil {
+		return "", false
+	}
+	return value, true
+}
 
 func (db *DBStorage) Close() error {
 	return db.DB.Close()

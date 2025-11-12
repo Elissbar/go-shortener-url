@@ -1,10 +1,12 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/Elissbar/go-shortener-url/internal/config"
 	"github.com/Elissbar/go-shortener-url/internal/model"
@@ -25,7 +27,7 @@ func (h *MyHandler) Router() chi.Router {
 
 	r.Use(h.LoggingMiddleware)
 	r.Use(ungzipMiddleware)
-    r.Use(gzipMiddleware)
+	r.Use(gzipMiddleware)
 
 	r.Post("/", h.CreateShortUrl)
 	r.Post("/api/shorten", h.CreateShortUrlJSON)
@@ -44,7 +46,11 @@ func (h *MyHandler) GetRoot(rw http.ResponseWriter, req *http.Request) {
 
 func (h *MyHandler) CreateShortUrlJSON(rw http.ResponseWriter, req *http.Request) {
 	if req.Method == http.MethodPost {
-		token, err := getToken(h.Storage)
+		ctx := req.Context()
+		ctx, cancel := context.WithTimeout(ctx, time.Second*3)
+		defer cancel()
+
+		token, err := getToken(ctx, h.Storage)
 		if err != nil {
 			http.Error(rw, "Error: "+err.Error(), http.StatusInternalServerError)
 			return
@@ -57,7 +63,7 @@ func (h *MyHandler) CreateShortUrlJSON(rw http.ResponseWriter, req *http.Request
 			return
 		}
 
-		h.Storage.Save(token, rq.URL)
+		h.Storage.Save(ctx, token, rq.URL)
 
 		var resp model.Response
 		resp.Result = h.Config.BaseURL + token
@@ -67,24 +73,25 @@ func (h *MyHandler) CreateShortUrlJSON(rw http.ResponseWriter, req *http.Request
 
 		rw.Header().Set("Content-Type", "application/json")
 		rw.WriteHeader(http.StatusCreated)
-		
+
 		enc := json.NewEncoder(rw)
 		if err := enc.Encode(resp); err != nil {
 			http.Error(rw, "Error: "+err.Error(), http.StatusInternalServerError)
 			return
-		}		
+		}
 	}
 }
 
 func (h *MyHandler) CreateShortUrl(rw http.ResponseWriter, req *http.Request) {
 	if req.Method == http.MethodPost {
-		token, err := generateToken()
+		ctx := req.Context()
+		ctx, cancel := context.WithTimeout(ctx, time.Second*3)
+		defer cancel()
+
+		token, err := getToken(ctx, h.Storage)
 		if err != nil {
 			http.Error(rw, "Error: "+err.Error(), http.StatusInternalServerError)
 			return
-		}
-		for _, ok := h.Storage.Get(token); ok; { // Если такой токен уже есть - генерируем новый
-			token, _ = generateToken()
 		}
 
 		body, err := io.ReadAll(req.Body) // получаем URL для сокращения
@@ -93,7 +100,7 @@ func (h *MyHandler) CreateShortUrl(rw http.ResponseWriter, req *http.Request) {
 			return
 		}
 
-		h.Storage.Save(token, string(body))
+		h.Storage.Save(ctx, token, string(body))
 
 		rw.Header().Set("content-type", "text/plain")
 		rw.WriteHeader(http.StatusCreated)
@@ -108,8 +115,12 @@ func (h *MyHandler) CreateShortUrl(rw http.ResponseWriter, req *http.Request) {
 
 func (h *MyHandler) GetShortUrl(rw http.ResponseWriter, req *http.Request) {
 	if req.Method == http.MethodGet {
+		ctx := req.Context()
+		ctx, cancel := context.WithTimeout(ctx, time.Second*3)
+		defer cancel()
+
 		id := chi.URLParam(req, "id")
-		url, ok := h.Storage.Get(id)
+		url, ok := h.Storage.Get(ctx, id)
 		if !ok {
 			rw.WriteHeader(http.StatusNotFound)
 			rw.Write([]byte("Not Found"))
@@ -129,5 +140,10 @@ func (h *MyHandler) CheckConnectionDB(rw http.ResponseWriter, req *http.Request)
 		}
 		rw.WriteHeader(http.StatusOK)
 		rw.Write([]byte("Database connection is success"))
+		return
 	}
+
+	// Если тип не подходит, все равно отправляем ответ
+	rw.WriteHeader(http.StatusInternalServerError)
+	rw.Write([]byte("Unsupported storage type"))
 }
