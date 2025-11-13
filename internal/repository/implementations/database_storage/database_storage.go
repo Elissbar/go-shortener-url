@@ -3,28 +3,34 @@ package databasestorage
 import (
 	"context"
 	"database/sql"
+	"fmt"
 
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
-	_ "github.com/jackc/pgx/v5/stdlib"
+	_ "github.com/lib/pq"
 )
 
 type DBStorage struct {
-	DB *sql.DB
+	DB             *sql.DB
 	connectionData string
 }
 
 func NewDatabaseStorage(connectionData string) (*DBStorage, error) {
-	db, err := sql.Open("pgx", connectionData)
-	storage := &DBStorage{db, connectionData}
+	db, err := sql.Open("postgres", connectionData)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to open database: %w", err)
+	}
+	// ПЕРВОЕ: проверяем соединение с БД
+	if err := db.Ping(); err != nil {
+		return nil, fmt.Errorf("failed to ping database: %w", err)
 	}
 
-	err = storage.Migrate()
-	if err != nil {
-		return nil, err
+	storage := &DBStorage{DB: db, connectionData: connectionData}
+
+	// ВТОРОЕ: применяем миграции
+	if err := storage.Migrate(); err != nil {
+		return nil, fmt.Errorf("failed to migrate: %w", err)
 	}
 
 	return storage, nil
@@ -33,19 +39,22 @@ func NewDatabaseStorage(connectionData string) (*DBStorage, error) {
 func (db *DBStorage) Migrate() error {
 	driver, err := postgres.WithInstance(db.DB, &postgres.Config{})
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create driver: %w", err)
 	}
+	
 	m, err := migrate.NewWithDatabaseInstance(
 		"file://migrations",
 		"postgres",
 		driver,
 	)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create migrate instance: %w", err)
 	}
+	
 	if err = m.Up(); err != nil && err != migrate.ErrNoChange {
-		return err
+		return fmt.Errorf("failed to apply migrations: %w", err)
 	}
+	
 	return nil
 }
 
