@@ -9,7 +9,8 @@ import (
 )
 
 type DBStorage struct {
-	DB *sql.DB
+	DB    *sql.DB
+	cache *Cache
 }
 
 func NewDatabaseStorage(connectionData string) (*DBStorage, error) {
@@ -20,13 +21,23 @@ func NewDatabaseStorage(connectionData string) (*DBStorage, error) {
 	if err != nil {
 		return nil, err
 	}
-	storage := &DBStorage{DB: db}
+	storage := &DBStorage{
+		DB: db,
+		cache: &Cache{
+			data: make(map[string]string),
+		},
+	}
 	return storage, nil
 }
 
-func (db *DBStorage) Save(token, url string) error { return nil }
+func (db *DBStorage) Save(token, url string) error {
+	db.cache.Save(token, url)
+	return nil
+}
 
-func (db *DBStorage) Get(token string) (string, bool) { return "", false }
+func (db *DBStorage) Get(token string) (string, bool) {
+	return db.cache.Get(token)
+}
 
 func (db *DBStorage) Close() error {
 	return db.DB.Close()
