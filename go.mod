@@ -4,6 +4,7 @@ module github.com/Elissbar/go-shortener-url
 go 1.24.8
 
 require (
+	github.com/caarlos0/env/v11 v11.3.1
 	github.com/go-chi/chi/v5 v5.2.3
 	github.com/golang-migrate/migrate/v4 v4.19.0
 	github.com/lib/pq v1.10.9

@@ -2,36 +2,41 @@ package main
 
 import (
 	"flag"
-	"os"
 
 	"github.com/Elissbar/go-shortener-url/internal/config"
+	"github.com/caarlos0/env/v11"
 )
 
 func parseFlags() (*config.Config, error) {
-	cfg := &config.Config{}
+	var cfg config.Config
+	err := env.Parse(&cfg)
+	if err != nil {
+		return nil, err
+	}
 
-	flag.StringVar(&cfg.ServerURL, "a", "localhost:8080", "<host>:<port>")
-	flag.StringVar(&cfg.BaseURL, "b", "http://localhost:8080/", "Base URL for the API. Example: http://localhost:8080/")
-	flag.StringVar(&cfg.LogLevel, "l", "info", "Log level. Example: info, debug, error")
-	flag.StringVar(&cfg.FileStoragePath, "f", "/tmp/links.json", "File storage path")
-	flag.StringVar(&cfg.DatabaseAdr, "d", "postgres://postgres:12345@localhost:5432/shorted_links?sslmode=disable", "Database connection string")
+	var serverURL, baseURL, logLevel, fileStoragePath, databaseAdr string
+	flag.StringVar(&serverURL, "a", ":8080", ":<port>")
+	flag.StringVar(&baseURL, "b", "http://localhost:8080/", "Base URL for the API. Example: http://localhost:8080/")
+	flag.StringVar(&logLevel, "l", "info", "Log level. Example: info, debug, error")
+	flag.StringVar(&fileStoragePath, "f", "/tmp/links.json", "File storage path")
+	flag.StringVar(&databaseAdr, "d", "postgres://postgres:12345@localhost:5432/shorted_links?sslmode=disable", "Database connection string")
 	flag.Parse()
 
-	if osEnvServerAddr := os.Getenv("SERVER_ADDRESS"); osEnvServerAddr != "" {
-		cfg.ServerURL = osEnvServerAddr
+	if cfg.ServerURL == "" {
+		cfg.ServerURL = serverURL
 	}
-	if osEnvBaseUrl := os.Getenv("BASE_URL"); osEnvBaseUrl != "" {
-		cfg.BaseURL = osEnvBaseUrl
+	if cfg.BaseURL == "" {
+		cfg.BaseURL = baseURL
 	}
-	if osEnvLogLevel := os.Getenv("LOG_LEVEL"); osEnvLogLevel != "" {
-		cfg.LogLevel = osEnvLogLevel
+	if cfg.LogLevel == "" {
+		cfg.LogLevel = logLevel
 	}
-	if envPath := os.Getenv("FILE_STORAGE_PATH"); envPath != "" {
-		cfg.FileStoragePath = envPath
+	if cfg.FileStoragePath == "" {
+		cfg.FileStoragePath = fileStoragePath
 	}
-	if dbAdr := os.Getenv("DATABASE_DSN"); dbAdr != "" {
-		cfg.DatabaseAdr = dbAdr
+	if cfg.DatabaseAdr == "" {
+		cfg.DatabaseAdr = databaseAdr
 	}
 
-	return cfg, nil
+	return &cfg, nil
 }
