@@ -47,6 +47,13 @@ func (fs *FileStorage) Save(ctx context.Context, token, url string) error {
 	return nil
 }
 
+func (fs *FileStorage) SaveBatch(ctx context.Context, batch []model.ReqBatch) error {
+	for _, b := range batch {
+		fs.Save(ctx, b.Token, b.OriginalURL)
+	}
+	return nil
+}
+
 func (fs *FileStorage) Get(ctx context.Context, token string) (string, bool) {
 	return fs.cache.Get(token)
 }

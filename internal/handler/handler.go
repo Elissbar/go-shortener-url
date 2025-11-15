@@ -31,6 +31,7 @@ func (h *MyHandler) Router() chi.Router {
 
 	r.Post("/", h.CreateShortUrl)
 	r.Post("/api/shorten", h.CreateShortUrlJSON)
+	r.Post("/api/shorten/batch", h.CreateShortBatch)
 	r.Get("/{id}", h.GetShortUrl)
 	r.Get("/", h.GetRoot)
 	r.Get("/ping", h.CheckConnectionDB)
@@ -46,6 +47,8 @@ func (h *MyHandler) GetRoot(rw http.ResponseWriter, req *http.Request) {
 
 func (h *MyHandler) CreateShortUrlJSON(rw http.ResponseWriter, req *http.Request) {
 	if req.Method == http.MethodPost {
+		defer req.Body.Close()
+
 		ctx := req.Context()
 		ctx, cancel := context.WithTimeout(ctx, time.Second*3)
 		defer cancel()
@@ -82,8 +85,54 @@ func (h *MyHandler) CreateShortUrlJSON(rw http.ResponseWriter, req *http.Request
 	}
 }
 
+func (h *MyHandler) CreateShortBatch(rw http.ResponseWriter, req *http.Request) {
+	if req.Method == http.MethodPost {
+		ctx := req.Context()
+		ctx, cancel := context.WithTimeout(ctx, time.Second*3)
+		defer cancel()
+		defer req.Body.Close()
+
+		var reqBatch []model.ReqBatch
+		dec := json.NewDecoder(req.Body)
+		if err := dec.Decode(&reqBatch); err != nil {
+			http.Error(rw, "Error: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		var respBatch []model.RespBatch
+		for i := range len(reqBatch) {
+			batch := &reqBatch[i]
+			token, err := getToken(ctx, h.Storage)
+			if err != nil {
+				http.Error(rw, "Error: "+err.Error(), http.StatusInternalServerError)
+				return
+			}
+
+			shortedUrl := h.Config.BaseURL + token
+			if !strings.HasSuffix(h.Config.BaseURL, "/") {
+				shortedUrl = h.Config.BaseURL + "/" + token
+			}
+			batch.Token = token
+			respBatch = append(respBatch, model.RespBatch{ID: batch.ID, ShortURL: shortedUrl})
+		}
+
+		h.Storage.SaveBatch(ctx, reqBatch)
+
+		rw.Header().Set("Content-Type", "application/json")
+		rw.WriteHeader(http.StatusCreated)
+
+		enc := json.NewEncoder(rw)
+		if err := enc.Encode(respBatch); err != nil {
+			http.Error(rw, "Error: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}
+}
+
 func (h *MyHandler) CreateShortUrl(rw http.ResponseWriter, req *http.Request) {
 	if req.Method == http.MethodPost {
+		defer req.Body.Close()
+
 		ctx := req.Context()
 		ctx, cancel := context.WithTimeout(ctx, time.Second*3)
 		defer cancel()

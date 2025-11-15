@@ -4,19 +4,26 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/base64"
+	"fmt"
 
 	"github.com/Elissbar/go-shortener-url/internal/repository"
 )
 
 func getToken(ctx context.Context, storage repository.Storage) (string, error) {
-	token, err := generateToken()
-	if err != nil {
-		return "", err
+	const maxAttempts = 5
+	for at := 0; at < maxAttempts; at++ {
+		token, err := generateToken()
+		if err != nil {
+			return "", err
+		}
+
+		// Проверяем, свободен ли токен
+		_, exists := storage.Get(ctx, token)
+		if !exists {
+			return token, nil
+		}
 	}
-	for _, ok := storage.Get(ctx, token); ok; { // Если такой токен уже есть - генерируем новый
-		token, _ = generateToken()
-	}
-	return token, nil
+	return "", fmt.Errorf("failed to generate unique token after %d attempts", maxAttempts)
 }
 
 func generateToken() (string, error) {

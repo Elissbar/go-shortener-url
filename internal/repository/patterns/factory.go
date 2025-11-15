@@ -15,7 +15,7 @@ func NewStorage(cfg *config.Config) (repository.Storage, error) {
 	}
 	if cfg.FileStoragePath != "" {
 		return filestorage.NewFileStorage(
-			&filestorage.FileManager{FilePath: cfg.FileStoragePath}, 
+			&filestorage.FileManager{FilePath: cfg.FileStoragePath},
 			&filestorage.JSONSerializer{},
 		)
 	}

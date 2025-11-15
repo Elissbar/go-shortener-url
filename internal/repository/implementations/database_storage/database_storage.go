@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 
+	"github.com/Elissbar/go-shortener-url/internal/model"
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
@@ -62,6 +63,22 @@ func (db *DBStorage) Save(ctx context.Context, token, url string) error {
 	_, err := db.DB.ExecContext(ctx, "INSERT INTO shorted_links (token, url) VALUES ($1, $2)", token, url)
 	if err != nil {
 		return err
+	}
+	return nil
+}
+
+func (db *DBStorage) SaveBatch(ctx context.Context, batch []model.ReqBatch) error {
+	stmt, err := db.DB.PrepareContext(ctx, "INSERT INTO shorted_links (token, url) VALUES ($1, $2)")
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+	
+	for _, b := range batch {
+		_, err := stmt.ExecContext(ctx, b.Token, b.OriginalURL)
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }

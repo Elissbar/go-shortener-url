@@ -86,10 +86,6 @@ func TestCreateShortUrl(t *testing.T) {
 }
 
 func TestGetShortUrl(t *testing.T) {
-	type want struct {
-		statusCode int
-	}
-
 	tests := []struct {
 		name               string
 		id                 string

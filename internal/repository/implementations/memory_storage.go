@@ -3,6 +3,8 @@ package implementations
 import (
 	"context"
 	"sync"
+
+	"github.com/Elissbar/go-shortener-url/internal/model"
 )
 
 type MemoryStorage struct {
@@ -11,6 +13,13 @@ type MemoryStorage struct {
 
 func (ms *MemoryStorage) Save(ctx context.Context, token, url string) error {
 	ms.Urls.Store(token, url)
+	return nil
+}
+
+func (ms *MemoryStorage) SaveBatch(ctx context.Context, batch []model.ReqBatch) error {
+	for _, b := range batch {
+		ms.Save(ctx, b.Token, b.OriginalURL)
+	}
 	return nil
 }
 
