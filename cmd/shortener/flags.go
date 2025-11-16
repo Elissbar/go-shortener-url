@@ -20,8 +20,8 @@ func parseFlags() (*config.Config, error) {
 	flag.StringVar(&logLevel, "l", "info", "Log level. Example: info, debug, error")
 	// flag.StringVar(&fileStoragePath, "f", "/tmp/links.json", "File storage path")
 	flag.StringVar(&fileStoragePath, "f", "", "File storage path")
-	flag.StringVar(&databaseAdr, "d", "postgres://postgres:12345@localhost:5432/shorted_links?sslmode=disable", "Database connection string")
-	// flag.StringVar(&databaseAdr, "d", "", "Database connection string")
+	// flag.StringVar(&databaseAdr, "d", "postgres://postgres:12345@localhost:5432/shorted_links?sslmode=disable", "Database connection string")
+	flag.StringVar(&databaseAdr, "d", "", "Database connection string")
 	flag.Parse()
 
 	if cfg.ServerURL == "" {
