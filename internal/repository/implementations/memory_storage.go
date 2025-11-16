@@ -5,15 +5,29 @@ import (
 	"sync"
 
 	"github.com/Elissbar/go-shortener-url/internal/model"
+	"github.com/Elissbar/go-shortener-url/internal/repository"
 )
 
 type MemoryStorage struct {
 	Urls sync.Map
 }
 
-func (ms *MemoryStorage) Save(ctx context.Context, token, url string) error {
+func (ms *MemoryStorage) Save(ctx context.Context, token, url string) (string, error) {
+	var oldToken, oldURL string
+	ms.Urls.Range(func(key, value any) bool {
+		if value == url {
+			oldToken = key.(string)
+			oldURL = value.(string)
+			return false
+		}
+		return true
+	})
+	if oldToken != "" && oldURL != "" {
+		return oldToken, repository.ErrURLExists
+	}
+
 	ms.Urls.Store(token, url)
-	return nil
+	return token, nil
 }
 
 func (ms *MemoryStorage) SaveBatch(ctx context.Context, batch []model.ReqBatch) error {

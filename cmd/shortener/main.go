@@ -2,6 +2,7 @@ package main
 
 import (
 	"net/http"
+	"reflect"
 
 	"github.com/Elissbar/go-shortener-url/internal/handler"
 	"github.com/Elissbar/go-shortener-url/internal/logger"
@@ -25,6 +26,9 @@ func main() {
 		panic(err)
 	}
 	defer storage.Close()
+	log.Infow("Storage type:",
+		"type", reflect.TypeOf(storage),
+	)
 
 	myHandler := &handler.MyHandler{
 		Storage: storage,
@@ -39,8 +43,6 @@ func main() {
 		panic(err)
 	}
 }
-
-
 
 // package main
 

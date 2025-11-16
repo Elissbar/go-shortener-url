@@ -3,6 +3,8 @@ package handler
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -47,7 +49,7 @@ func (h *MyHandler) GetRoot(rw http.ResponseWriter, req *http.Request) {
 
 func (h *MyHandler) CreateShortUrlJSON(rw http.ResponseWriter, req *http.Request) {
 	if req.Method == http.MethodPost {
-		defer req.Body.Close()
+		rw.Header().Set("Content-Type", "application/json")
 
 		ctx := req.Context()
 		ctx, cancel := context.WithTimeout(ctx, time.Second*3)
@@ -65,17 +67,21 @@ func (h *MyHandler) CreateShortUrlJSON(rw http.ResponseWriter, req *http.Request
 			http.Error(rw, "Error: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
-
-		h.Storage.Save(ctx, token, rq.URL)
+		defer req.Body.Close()
 
 		var resp model.Response
-		resp.Result = h.Config.BaseURL + token
-		if !strings.HasSuffix(h.Config.BaseURL, "/") {
-			resp.Result = h.Config.BaseURL + "/" + token
+
+		savedToken, err := h.Storage.Save(ctx, token, rq.URL)
+		if err != nil && errors.Is(err, repository.ErrURLExists) {
+			rw.WriteHeader(http.StatusConflict)
+		} else {
+			rw.WriteHeader(http.StatusCreated)
 		}
 
-		rw.Header().Set("Content-Type", "application/json")
-		rw.WriteHeader(http.StatusCreated)
+		resp.Result = h.Config.BaseURL + savedToken
+		if !strings.HasSuffix(h.Config.BaseURL, "/") {
+			resp.Result = h.Config.BaseURL + "/" + savedToken
+		}
 
 		enc := json.NewEncoder(rw)
 		if err := enc.Encode(resp); err != nil {
@@ -131,7 +137,7 @@ func (h *MyHandler) CreateShortBatch(rw http.ResponseWriter, req *http.Request) 
 
 func (h *MyHandler) CreateShortUrl(rw http.ResponseWriter, req *http.Request) {
 	if req.Method == http.MethodPost {
-		defer req.Body.Close()
+		rw.Header().Set("content-type", "text/plain")
 
 		ctx := req.Context()
 		ctx, cancel := context.WithTimeout(ctx, time.Second*3)
@@ -148,15 +154,21 @@ func (h *MyHandler) CreateShortUrl(rw http.ResponseWriter, req *http.Request) {
 			http.Error(rw, "Error: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
+		defer req.Body.Close()
 
-		h.Storage.Save(ctx, token, string(body))
+		savedToken, err := h.Storage.Save(ctx, token, string(body))
+		if err != nil {
+			fmt.Println(err)
+			if errors.Is(err, repository.ErrURLExists) {
+				rw.WriteHeader(http.StatusConflict)
+			}
+		} else {
+			rw.WriteHeader(http.StatusCreated)
+		}
 
-		rw.Header().Set("content-type", "text/plain")
-		rw.WriteHeader(http.StatusCreated)
-
-		shortedUrl := h.Config.BaseURL + token
+		shortedUrl := h.Config.BaseURL + savedToken
 		if !strings.HasSuffix(h.Config.BaseURL, "/") {
-			shortedUrl = h.Config.BaseURL + "/" + token
+			shortedUrl = h.Config.BaseURL + "/" + savedToken
 		}
 		rw.Write([]byte(shortedUrl))
 	}

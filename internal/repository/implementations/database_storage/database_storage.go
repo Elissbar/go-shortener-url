@@ -3,13 +3,19 @@ package databasestorage
 import (
 	"context"
 	"database/sql"
+	"errors"
+
 	"fmt"
 
 	"github.com/Elissbar/go-shortener-url/internal/model"
+	"github.com/Elissbar/go-shortener-url/internal/repository"
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database/postgres"
+	"github.com/jackc/pgerrcode"
+
+	"github.com/lib/pq"
+
 	_ "github.com/golang-migrate/migrate/v4/source/file"
-	_ "github.com/lib/pq"
 )
 
 type DBStorage struct {
@@ -42,7 +48,7 @@ func (db *DBStorage) Migrate() error {
 	if err != nil {
 		return fmt.Errorf("failed to create driver: %w", err)
 	}
-	
+
 	m, err := migrate.NewWithDatabaseInstance(
 		"file://migrations",
 		"postgres",
@@ -51,20 +57,30 @@ func (db *DBStorage) Migrate() error {
 	if err != nil {
 		return fmt.Errorf("failed to create migrate instance: %w", err)
 	}
-	
+
 	if err = m.Up(); err != nil && err != migrate.ErrNoChange {
 		return fmt.Errorf("failed to apply migrations: %w", err)
 	}
-	
+
 	return nil
 }
 
-func (db *DBStorage) Save(ctx context.Context, token, url string) error {
+func (db *DBStorage) Save(ctx context.Context, token, url string) (string, error) {
 	_, err := db.DB.ExecContext(ctx, "INSERT INTO shorted_links (token, url) VALUES ($1, $2)", token, url)
 	if err != nil {
-		return err
+		var pgErr *pq.Error
+		if errors.As(err, &pgErr) && pgErr.Code == pgerrcode.UniqueViolation {
+			var oldToken string
+			row := db.DB.QueryRowContext(ctx, "SELECT token FROM shorted_links WHERE url = $1", url)
+			err = row.Scan(&oldToken)
+			if err != nil {
+				return "", err
+			}
+			return oldToken, repository.ErrURLExists
+		}
+		return "", err
 	}
-	return nil
+	return token, nil
 }
 
 func (db *DBStorage) SaveBatch(ctx context.Context, batch []model.ReqBatch) error {
@@ -73,7 +89,7 @@ func (db *DBStorage) SaveBatch(ctx context.Context, batch []model.ReqBatch) erro
 		return err
 	}
 	defer stmt.Close()
-	
+
 	for _, b := range batch {
 		_, err := stmt.ExecContext(ctx, b.Token, b.OriginalURL)
 		if err != nil {

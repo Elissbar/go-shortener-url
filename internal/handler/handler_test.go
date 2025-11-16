@@ -55,7 +55,7 @@ func TestCreateShortUrl(t *testing.T) {
 	}{
 		{
 			name:    "Create short url",
-			request: "https://practicum.yandex.ru/",
+			request: "https://practicum.yandex2.ru/",
 			want: want{
 				contentType: "text/plain",
 				statusCode:  http.StatusCreated,
@@ -63,7 +63,7 @@ func TestCreateShortUrl(t *testing.T) {
 		},
 		{
 			name:    "Create short url 2",
-			request: "https://www.google.com/",
+			request: "https://www.google2.com/",
 			want: want{
 				contentType: "text/plain",
 				statusCode:  http.StatusCreated,
@@ -137,7 +137,7 @@ func TestCreateShortUrlJSON(t *testing.T) {
 	}{
 		{
 			name:    "Create short url",
-			request: "https://practicum.yandex.ru/",
+			request: "https://practicum.yandex1.ru/",
 			want: want{
 				contentType: "application/json",
 				statusCode:  http.StatusCreated,
@@ -145,7 +145,7 @@ func TestCreateShortUrlJSON(t *testing.T) {
 		},
 		{
 			name:    "Create short url 2",
-			request: "https://www.google.com/",
+			request: "https://www.google1.com/",
 			want: want{
 				contentType: "application/json",
 				statusCode:  http.StatusCreated,

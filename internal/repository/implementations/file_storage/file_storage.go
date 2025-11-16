@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	"github.com/Elissbar/go-shortener-url/internal/model"
+	"github.com/Elissbar/go-shortener-url/internal/repository"
 )
 
 type FileStorage struct {
@@ -19,9 +20,7 @@ func NewFileStorage(fm *FileManager, sr Serializer) (*FileStorage, error) {
 		fileManager: fm,
 		serializer:  sr,
 		cache: &Cache{
-			data:        make(map[string]string),
-			fileManager: fm,
-			serializer:  sr,
+			data: make(map[string]string),
 		},
 	}
 	if err := fs.fileManager.EnsureFile(); err != nil {
@@ -37,14 +36,22 @@ func NewFileStorage(fm *FileManager, sr Serializer) (*FileStorage, error) {
 	}
 	// Загружаем в память
 	for _, record := range records {
-		fs.cache.Save(record.ShortURL, record.OriginalURL)
+		fs.cache.SaveToMemory(record.ShortURL, record.OriginalURL)
 	}
 	return fs, nil
 }
 
-func (fs *FileStorage) Save(ctx context.Context, token, url string) error {
-	fs.cache.Save(token, url)
-	return nil
+func (fs *FileStorage) Save(ctx context.Context, token, url string) (string, error) {
+	fs.cache.mu.Lock()
+	defer fs.cache.mu.Unlock()
+
+	for oldToken, val := range fs.cache.data {
+		if val == url {
+			return oldToken, repository.ErrURLExists
+		}
+	}
+	fs.cache.data[token] = url
+	return token, nil
 }
 
 func (fs *FileStorage) SaveBatch(ctx context.Context, batch []model.ReqBatch) error {
@@ -55,7 +62,10 @@ func (fs *FileStorage) SaveBatch(ctx context.Context, batch []model.ReqBatch) er
 }
 
 func (fs *FileStorage) Get(ctx context.Context, token string) (string, bool) {
-	return fs.cache.Get(token)
+	fs.cache.mu.RLock()
+	defer fs.cache.mu.RUnlock()
+	url, exists := fs.cache.data[token]
+	return url, exists
 }
 
 func (fs *FileStorage) Close() error {
@@ -73,6 +83,9 @@ func (fs *FileStorage) Close() error {
 		i++
 	}
 	byteData, err := fs.serializer.Marshal(records)
+	if err != nil {
+		return err
+	}
 	err = fs.fileManager.SaveToFile(byteData)
 	if err != nil {
 		return err
