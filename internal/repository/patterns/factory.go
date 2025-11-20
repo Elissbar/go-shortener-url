@@ -3,9 +3,9 @@ package patterns
 import (
 	"github.com/Elissbar/go-shortener-url/internal/config"
 	"github.com/Elissbar/go-shortener-url/internal/repository"
-	"github.com/Elissbar/go-shortener-url/internal/repository/implementations"
 	databasestorage "github.com/Elissbar/go-shortener-url/internal/repository/implementations/database_storage"
 	filestorage "github.com/Elissbar/go-shortener-url/internal/repository/implementations/file_storage"
+	memorystorage "github.com/Elissbar/go-shortener-url/internal/repository/implementations/memory_storage"
 )
 
 func NewStorage(cfg *config.Config) (repository.Storage, error) {
@@ -20,5 +20,5 @@ func NewStorage(cfg *config.Config) (repository.Storage, error) {
 		)
 	}
 
-	return &implementations.MemoryStorage{}, nil
+	return memorystorage.NewMemoryStorage()
 }

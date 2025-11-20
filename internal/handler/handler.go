@@ -30,10 +30,10 @@ func (h *MyHandler) Router() chi.Router {
 	r.Use(ungzipMiddleware)
 	r.Use(gzipMiddleware)
 
-	r.Post("/", h.CreateShortUrl)
-	r.Post("/api/shorten", h.CreateShortUrlJSON)
+	r.Post("/", h.CreateShortURL)
+	r.Post("/api/shorten", h.CreateShortURLJSON)
 	r.Post("/api/shorten/batch", h.CreateShortBatch)
-	r.Get("/{id}", h.GetShortUrl)
+	r.Get("/{id}", h.GetShortURL)
 	r.Get("/", h.GetRoot)
 	r.Get("/ping", h.CheckConnectionDB)
 
@@ -46,7 +46,7 @@ func (h *MyHandler) GetRoot(rw http.ResponseWriter, req *http.Request) {
 	}
 }
 
-func (h *MyHandler) CreateShortUrlJSON(rw http.ResponseWriter, req *http.Request) {
+func (h *MyHandler) CreateShortURLJSON(rw http.ResponseWriter, req *http.Request) {
 	if req.Method == http.MethodPost {
 		rw.Header().Set("Content-Type", "application/json")
 
@@ -113,12 +113,12 @@ func (h *MyHandler) CreateShortBatch(rw http.ResponseWriter, req *http.Request) 
 				return
 			}
 
-			shortedUrl := h.Config.BaseURL + token
+			shortedURL := h.Config.BaseURL + token
 			if !strings.HasSuffix(h.Config.BaseURL, "/") {
-				shortedUrl = h.Config.BaseURL + "/" + token
+				shortedURL = h.Config.BaseURL + "/" + token
 			}
 			batch.Token = token
-			respBatch = append(respBatch, model.RespBatch{ID: batch.ID, ShortURL: shortedUrl})
+			respBatch = append(respBatch, model.RespBatch{ID: batch.ID, ShortURL: shortedURL})
 		}
 
 		h.Storage.SaveBatch(ctx, reqBatch)
@@ -134,7 +134,7 @@ func (h *MyHandler) CreateShortBatch(rw http.ResponseWriter, req *http.Request) 
 	}
 }
 
-func (h *MyHandler) CreateShortUrl(rw http.ResponseWriter, req *http.Request) {
+func (h *MyHandler) CreateShortURL(rw http.ResponseWriter, req *http.Request) {
 	if req.Method == http.MethodPost {
 		rw.Header().Set("content-type", "text/plain")
 
@@ -165,15 +165,15 @@ func (h *MyHandler) CreateShortUrl(rw http.ResponseWriter, req *http.Request) {
 			rw.WriteHeader(http.StatusCreated)
 		}
 
-		shortedUrl := h.Config.BaseURL + savedToken
+		shortedURL := h.Config.BaseURL + savedToken
 		if !strings.HasSuffix(h.Config.BaseURL, "/") {
-			shortedUrl = h.Config.BaseURL + "/" + savedToken
+			shortedURL = h.Config.BaseURL + "/" + savedToken
 		}
-		rw.Write([]byte(shortedUrl))
+		rw.Write([]byte(shortedURL))
 	}
 }
 
-func (h *MyHandler) GetShortUrl(rw http.ResponseWriter, req *http.Request) {
+func (h *MyHandler) GetShortURL(rw http.ResponseWriter, req *http.Request) {
 	if req.Method == http.MethodGet {
 		ctx := req.Context()
 		ctx, cancel := context.WithTimeout(ctx, time.Second*3)

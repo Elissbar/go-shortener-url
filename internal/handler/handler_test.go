@@ -13,8 +13,8 @@ import (
 	"github.com/Elissbar/go-shortener-url/internal/config"
 	"github.com/Elissbar/go-shortener-url/internal/logger"
 	"github.com/Elissbar/go-shortener-url/internal/model"
-	"github.com/Elissbar/go-shortener-url/internal/repository/implementations"
 	"github.com/stretchr/testify/require"
+	memorystorage "github.com/Elissbar/go-shortener-url/internal/repository/implementations/memory_storage"
 )
 
 var myHandler MyHandler
@@ -32,8 +32,9 @@ func TestMain(m *testing.M) {
 	}
 	defer log.Sync()
 
+	storage, _ := memorystorage.NewMemoryStorage()
 	myHandler = MyHandler{
-		Storage: &implementations.MemoryStorage{},
+		Storage: storage,
 		Config:  cfg,
 		Logger:  log,
 	}
@@ -79,6 +80,7 @@ func TestCreateShortUrl(t *testing.T) {
 		router.ServeHTTP(w, request)
 
 		result := w.Result()
+		defer result.Body.Close()
 
 		require.Equal(t, tt.want.statusCode, result.StatusCode)
 		require.Equal(t, tt.want.contentType, result.Header.Get("Content-Type"))
@@ -106,9 +108,9 @@ func TestGetShortUrl(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		urls := sync.Map{}
+		urls := &sync.Map{}
 		urls.Store(tt.id, tt.redirectTo)
-		myHandler.Storage = &implementations.MemoryStorage{TokenURL: urls}
+		myHandler.Storage = &memorystorage.MemoryStorage{TokenURL: urls, URLToken: &sync.Map{}}
 
 		request := httptest.NewRequest(http.MethodGet, "/"+tt.id, nil)
 		w := httptest.NewRecorder()
@@ -117,6 +119,7 @@ func TestGetShortUrl(t *testing.T) {
 		router.ServeHTTP(w, request)
 
 		result := w.Result()
+		defer result.Body.Close()
 		redirectedTo, _ := result.Location()
 
 		require.Equal(t, tt.expectedStatusCode, result.StatusCode)
@@ -169,6 +172,7 @@ func TestCreateShortUrlJSON(t *testing.T) {
 		router.ServeHTTP(w, request)
 
 		result := w.Result()
+		defer result.Body.Close()
 
 		body, _ := io.ReadAll(result.Body)
 		var resp model.Response

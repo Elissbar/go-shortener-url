@@ -1,4 +1,4 @@
-package implementations
+package memorystorage
 
 import (
 	"context"
@@ -8,8 +8,15 @@ import (
 )
 
 type MemoryStorage struct {
-	TokenURL sync.Map // token: url
-	URLToken sync.Map // url: token
+	TokenURL *sync.Map // token: url
+	URLToken *sync.Map // url: token
+}
+
+func NewMemoryStorage() (*MemoryStorage, error) {
+	return &MemoryStorage{
+		TokenURL: &sync.Map{},
+		URLToken: &sync.Map{},
+	}, nil
 }
 
 func (ms *MemoryStorage) Save(ctx context.Context, token, url string) (string, error) {
