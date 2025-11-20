@@ -108,7 +108,7 @@ func TestGetShortUrl(t *testing.T) {
 	for _, tt := range tests {
 		urls := sync.Map{}
 		urls.Store(tt.id, tt.redirectTo)
-		myHandler.Storage = &implementations.MemoryStorage{Urls: urls}
+		myHandler.Storage = &implementations.MemoryStorage{TokenURL: urls}
 
 		request := httptest.NewRequest(http.MethodGet, "/"+tt.id, nil)
 		w := httptest.NewRecorder()
