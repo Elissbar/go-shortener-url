@@ -13,7 +13,6 @@ import (
 	"github.com/Elissbar/go-shortener-url/internal/config"
 	"github.com/Elissbar/go-shortener-url/internal/model"
 	"github.com/Elissbar/go-shortener-url/internal/repository"
-	databasestorage "github.com/Elissbar/go-shortener-url/internal/repository/implementations/database_storage"
 	"github.com/go-chi/chi/v5"
 	"go.uber.org/zap"
 )
@@ -192,19 +191,12 @@ func (h *MyHandler) GetShortUrl(rw http.ResponseWriter, req *http.Request) {
 }
 
 func (h *MyHandler) CheckConnectionDB(rw http.ResponseWriter, req *http.Request) {
-	if db, ok := h.Storage.(*databasestorage.DBStorage); ok {
-		err := db.DB.Ping()
-		if err != nil {
-			rw.WriteHeader(http.StatusInternalServerError)
-			rw.Write([]byte("Database connection is not success"))
-			return
-		}
-		rw.WriteHeader(http.StatusOK)
-		rw.Write([]byte("Database connection is success"))
+	if err := h.Storage.Ping(); err != nil {
+		rw.WriteHeader(http.StatusInternalServerError)
+		rw.Write([]byte("Database connection is not success"))
 		return
 	}
 
-	// Если тип не подходит, все равно отправляем ответ
-	rw.WriteHeader(http.StatusInternalServerError)
-	rw.Write([]byte("Unsupported storage type"))
+	rw.WriteHeader(http.StatusOK)
+	rw.Write([]byte("Database connection is success"))
 }

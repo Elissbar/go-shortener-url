@@ -84,18 +84,20 @@ func (db *DBStorage) Save(ctx context.Context, token, url string) (string, error
 }
 
 func (db *DBStorage) SaveBatch(ctx context.Context, batch []model.ReqBatch) error {
-	stmt, err := db.DB.PrepareContext(ctx, "INSERT INTO shorted_links (token, url) VALUES ($1, $2)")
+	tx, err := db.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
-	defer stmt.Close()
 
 	for _, b := range batch {
-		_, err := stmt.ExecContext(ctx, b.Token, b.OriginalURL)
+		_, err := tx.ExecContext(ctx, "INSERT INTO shorted_links (token, url) VALUES ($1, $2)", b.Token, b.OriginalURL)
 		if err != nil {
+			tx.Rollback()
 			return err
 		}
 	}
+
+	tx.Commit()
 	return nil
 }
 
@@ -112,4 +114,8 @@ func (db *DBStorage) Get(ctx context.Context, token string) (string, bool) {
 
 func (db *DBStorage) Close() error {
 	return db.DB.Close()
+}
+
+func (db *DBStorage) Ping() error {
+	return db.DB.Ping()
 }

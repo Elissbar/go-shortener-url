@@ -92,3 +92,7 @@ func (fs *FileStorage) Close() error {
 	}
 	return nil
 }
+
+func (fs *FileStorage) Ping() error {
+	return nil
+}

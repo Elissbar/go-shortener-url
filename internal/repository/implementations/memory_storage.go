@@ -5,28 +5,20 @@ import (
 	"sync"
 
 	"github.com/Elissbar/go-shortener-url/internal/model"
-	"github.com/Elissbar/go-shortener-url/internal/repository"
 )
 
 type MemoryStorage struct {
-	Urls sync.Map
+	TokenURL sync.Map // token: url
+	URLToken sync.Map // url: token
 }
 
 func (ms *MemoryStorage) Save(ctx context.Context, token, url string) (string, error) {
-	var oldToken, oldURL string
-	ms.Urls.Range(func(key, value any) bool {
-		if value == url {
-			oldToken = key.(string)
-			oldURL = value.(string)
-			return false
-		}
-		return true
-	})
-	if oldToken != "" && oldURL != "" {
-		return oldToken, repository.ErrURLExists
+	if val, ok := ms.URLToken.Load(url); ok {
+		return val.(string), nil // Возвращаем токен, если URL уже существует
 	}
 
-	ms.Urls.Store(token, url)
+	ms.TokenURL.Store(token, url)
+	ms.URLToken.Store(url, token)
 	return token, nil
 }
 
@@ -38,7 +30,7 @@ func (ms *MemoryStorage) SaveBatch(ctx context.Context, batch []model.ReqBatch) 
 }
 
 func (ms *MemoryStorage) Get(ctx context.Context, token string) (string, bool) {
-	val, ok := ms.Urls.Load(token)
+	val, ok := ms.TokenURL.Load(token)
 	if !ok {
 		return "", false
 	}
@@ -46,3 +38,5 @@ func (ms *MemoryStorage) Get(ctx context.Context, token string) (string, bool) {
 }
 
 func (ms *MemoryStorage) Close() error { return nil }
+
+func (ms *MemoryStorage) Ping() error { return nil }

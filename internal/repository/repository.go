@@ -11,4 +11,5 @@ type Storage interface {
 	SaveBatch(ctx context.Context, batch []model.ReqBatch) error
 	Get(ctx context.Context, token string) (string, bool)
 	Close() error
+	Ping() error
 }
