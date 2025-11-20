@@ -1,6 +1,7 @@
 package filestorage
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 )
@@ -13,15 +14,37 @@ func NewFileManager(FilePath string) *FileManager {
 	return &FileManager{FilePath: FilePath}
 }
 
-func (fm *FileManager) Read() ([]byte, error) {
-	return os.ReadFile(fm.FilePath)
-}
-
-func (fm *FileManager) Write(data []byte) error {
+func (fm *FileManager) ensureFile() error {
+	// Создаем директорию
 	dir := filepath.Dir(fm.FilePath)
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return err
 	}
+	
+	// Если файла нет - создаем пустой
+	if _, err := os.Stat(fm.FilePath); os.IsNotExist(err) {
+		return os.WriteFile(fm.FilePath, []byte("[]"), 0644)
+	}
+	
+	return nil
+}
+
+func (fm *FileManager) Read() ([]byte, error) {
+	if err := fm.ensureFile(); err != nil {
+		return nil, err
+	}
+	data, err := os.ReadFile(fm.FilePath)
+	if errors.Is(err, os.ErrNotExist) {
+		return []byte{}, nil // ← возвращаем пустые данные вместо ошибки
+	}
+	return data, err
+}
+
+func (fm *FileManager) Write(data []byte) error {
+	// dir := filepath.Dir(fm.FilePath)
+	// if err := os.MkdirAll(dir, 0755); err != nil {
+	// 	return err
+	// }
 
 	tempPath := fm.FilePath + ".tmp"
 	if err := os.WriteFile(tempPath, data, 0644); err != nil {
