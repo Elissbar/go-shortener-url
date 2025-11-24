@@ -76,7 +76,7 @@ func (fs *FileStorage) saveToFile() error {
 
 }
 
-func (fs *FileStorage) Save(ctx context.Context, token, url, userID string) (string, error) {
+func (fs *FileStorage) Save(ctx context.Context, token, url, _, _ string) (string, error) {
 	if val, ok := fs.urlToken.Load(url); ok {
 		return val.(string), repository.ErrURLExists // Возвращаем токен, если URL уже существует
 	}
@@ -90,9 +90,9 @@ func (fs *FileStorage) Save(ctx context.Context, token, url, userID string) (str
 	return token, nil
 }
 
-func (fs *FileStorage) SaveBatch(ctx context.Context, batch []model.ReqBatch, userID string) error {
+func (fs *FileStorage) SaveBatch(ctx context.Context, batch []model.ReqBatch, userID, baseURL string) error {
 	for _, b := range batch {
-		fs.Save(ctx, b.Token, b.OriginalURL, userID)
+		fs.Save(ctx, b.Token, b.OriginalURL, userID, baseURL)
 	}
 	return nil
 }

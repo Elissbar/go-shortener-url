@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -74,19 +75,20 @@ func (h *MyHandler) CreateShortURLJSON(rw http.ResponseWriter, req *http.Request
 		}
 		defer req.Body.Close()
 
-		var resp model.Response
+		baseURL := h.Config.BaseURL
+		if !strings.HasSuffix(h.Config.BaseURL, "/") {
+			baseURL = h.Config.BaseURL + "/"
+		}
 
-		savedToken, err := h.Storage.Save(ctx, token, rq.URL, userID)
+		savedToken, err := h.Storage.Save(ctx, token, rq.URL, userID, baseURL)
 		if err != nil && errors.Is(err, repository.ErrURLExists) {
 			rw.WriteHeader(http.StatusConflict)
 		} else {
 			rw.WriteHeader(http.StatusCreated)
 		}
 
-		resp.Result = h.Config.BaseURL + savedToken
-		if !strings.HasSuffix(h.Config.BaseURL, "/") {
-			resp.Result = h.Config.BaseURL + "/" + savedToken
-		}
+		var resp model.Response
+		resp.Result = baseURL + savedToken
 
 		enc := json.NewEncoder(rw)
 		if err := enc.Encode(resp); err != nil {
@@ -116,6 +118,11 @@ func (h *MyHandler) CreateShortBatch(rw http.ResponseWriter, req *http.Request) 
 			return
 		}
 
+		baseURL := h.Config.BaseURL
+		if !strings.HasSuffix(h.Config.BaseURL, "/") {
+			baseURL = h.Config.BaseURL + "/"
+		}
+
 		var respBatch []model.RespBatch
 		for i := range len(reqBatch) {
 			batch := &reqBatch[i]
@@ -125,15 +132,16 @@ func (h *MyHandler) CreateShortBatch(rw http.ResponseWriter, req *http.Request) 
 				return
 			}
 
-			shortedURL := h.Config.BaseURL + token
-			if !strings.HasSuffix(h.Config.BaseURL, "/") {
-				shortedURL = h.Config.BaseURL + "/" + token
-			}
+			// shortedURL := h.Config.BaseURL + token
+			// if !strings.HasSuffix(h.Config.BaseURL, "/") {
+			// 	shortedURL = h.Config.BaseURL + "/" + token
+			// }
+			shortedURL := baseURL + token
 			batch.Token = token
 			respBatch = append(respBatch, model.RespBatch{ID: batch.ID, ShortURL: shortedURL})
 		}
 
-		h.Storage.SaveBatch(ctx, reqBatch, userID)
+		h.Storage.SaveBatch(ctx, reqBatch, userID, baseURL)
 
 		rw.Header().Set("Content-Type", "application/json")
 		rw.WriteHeader(http.StatusCreated)
@@ -172,13 +180,14 @@ func (h *MyHandler) CreateShortURL(rw http.ResponseWriter, req *http.Request) {
 		}
 		defer req.Body.Close()
 
-		// baseURL := h.Config.BaseURL 
-		// if !strings.HasSuffix(h.Config.BaseURL, "/") {
-		// 	baseURL = h.Config.BaseURL + "/" 
-		// } 
+		baseURL := h.Config.BaseURL
+		if !strings.HasSuffix(h.Config.BaseURL, "/") {
+			baseURL = h.Config.BaseURL + "/"
+		}
 
-		savedToken, err := h.Storage.Save(ctx, token, string(body), userID)
+		savedToken, err := h.Storage.Save(ctx, token, string(body), userID, baseURL)
 		if err != nil {
+			fmt.Println("we in:", err.Error())
 			if errors.Is(err, repository.ErrURLExists) {
 				rw.WriteHeader(http.StatusConflict)
 			}
@@ -186,10 +195,7 @@ func (h *MyHandler) CreateShortURL(rw http.ResponseWriter, req *http.Request) {
 			rw.WriteHeader(http.StatusCreated)
 		}
 
-		shortedURL := h.Config.BaseURL + savedToken
-		if !strings.HasSuffix(h.Config.BaseURL, "/") {
-			shortedURL = h.Config.BaseURL + "/" + savedToken
-		}
+		shortedURL := baseURL + savedToken
 		rw.Write([]byte(shortedURL))
 	}
 }
@@ -233,5 +239,19 @@ func (h *MyHandler) GetAllUserURLs(rw http.ResponseWriter, req *http.Request) {
 	ctx, cancel := context.WithTimeout(ctx, time.Second*3)
 	defer cancel()
 
-	h.Storage.GetAllUsersURLs(ctx, userID)
+	records, err := h.Storage.GetAllUsersURLs(ctx, userID)
+	if err != nil {
+		http.Error(rw, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	if len(records) == 0 {
+		rw.WriteHeader(http.StatusNoContent)
+	}
+
+	enc := json.NewEncoder(rw)
+	if err := enc.Encode(records); err != nil {
+		http.Error(rw, "Error: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
 }

@@ -65,8 +65,8 @@ func (db *DBStorage) Migrate() error {
 	return nil
 }
 
-func (db *DBStorage) Save(ctx context.Context, token, url, userID string) (string, error) {
-	_, err := db.DB.ExecContext(ctx, "INSERT INTO shorted_links (token, url, user_id) VALUES ($1, $2, $3)", token, url, userID)
+func (db *DBStorage) Save(ctx context.Context, token, url, userID, baseURL string) (string, error) {
+	_, err := db.DB.ExecContext(ctx, "INSERT INTO shorted_links (token, url, user_id, shorted_url) VALUES ($1, $2, $3, $4)", token, url, userID, baseURL+token)
 	if err != nil {
 		var pgErr *pq.Error
 		if errors.As(err, &pgErr) && pgErr.Code == pgerrcode.UniqueViolation {
@@ -83,14 +83,14 @@ func (db *DBStorage) Save(ctx context.Context, token, url, userID string) (strin
 	return token, nil
 }
 
-func (db *DBStorage) SaveBatch(ctx context.Context, batch []model.ReqBatch, userID string) error {
+func (db *DBStorage) SaveBatch(ctx context.Context, batch []model.ReqBatch, userID, baseURL string) error {
 	tx, err := db.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
 
 	for _, b := range batch {
-		_, err := tx.ExecContext(ctx, "INSERT INTO shorted_links (token, url) VALUES ($1, $2, $3)", b.Token, b.OriginalURL, userID)
+		_, err := tx.ExecContext(ctx, "INSERT INTO shorted_links (token, url, user_id, shorted_url) VALUES ($1, $2, $3, $4)", b.Token, b.OriginalURL, userID, baseURL + b.Token)
 		if err != nil {
 			tx.Rollback()
 			return err
@@ -113,9 +113,27 @@ func (db *DBStorage) Get(ctx context.Context, token string) (string, bool) {
 }
 
 func (db *DBStorage) GetAllUsersURLs(ctx context.Context, userID string) ([]model.URLRecord, error) {
-	rows := db.DB.QueryRowContext(ctx, "SELECT token, url FROM shorted_links WHERE user_id = $1", userID)
+	rows, err := db.DB.QueryContext(ctx, "SELECT shorted_url, url FROM shorted_links WHERE user_id = $1", userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
 	fmt.Println("rows here:", rows)
-	return []model.URLRecord{}, nil
+	records := []model.URLRecord{}
+	for rows.Next() {
+		var record model.URLRecord
+		err := rows.Scan(
+			&record.ShortURL,
+			&record.OriginalURL,
+		)
+		if err != nil {
+            return nil, err
+        }
+		records = append(records, record)
+	}
+
+	return records, nil
 } 
 
 func (db *DBStorage) Close() error {

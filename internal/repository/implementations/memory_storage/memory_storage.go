@@ -20,7 +20,7 @@ func NewMemoryStorage() (*MemoryStorage, error) {
 	}, nil
 }
 
-func (ms *MemoryStorage) Save(ctx context.Context, token, url, userID string) (string, error) {
+func (ms *MemoryStorage) Save(ctx context.Context, token, url, _, _ string) (string, error) {
 	if val, ok := ms.URLToken.Load(url); ok {
 		return val.(string), repository.ErrURLExists // Возвращаем токен, если URL уже существует
 	}
@@ -30,9 +30,9 @@ func (ms *MemoryStorage) Save(ctx context.Context, token, url, userID string) (s
 	return token, nil
 }
 
-func (ms *MemoryStorage) SaveBatch(ctx context.Context, batch []model.ReqBatch, userID string) error {
+func (ms *MemoryStorage) SaveBatch(ctx context.Context, batch []model.ReqBatch, userID, baseURL string) error {
 	for _, b := range batch {
-		ms.Save(ctx, b.Token, b.OriginalURL, userID)
+		ms.Save(ctx, b.Token, b.OriginalURL, userID, baseURL)
 	}
 	return nil
 }

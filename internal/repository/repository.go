@@ -7,8 +7,8 @@ import (
 )
 
 type Storage interface {
-	Save(ctx context.Context, token, url, user_id string) (string, error)
-	SaveBatch(ctx context.Context, batch []model.ReqBatch, userID string) error
+	Save(ctx context.Context, token, url, userID, baseURL string) (string, error)
+	SaveBatch(ctx context.Context, batch []model.ReqBatch, userID, baseURL string) error
 	Get(ctx context.Context, token string) (string, bool)
 	GetAllUsersURLs(ctx context.Context, userID string) ([]model.URLRecord, error)
 	Close() error
