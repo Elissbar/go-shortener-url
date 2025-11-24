@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -27,6 +26,7 @@ func (h *MyHandler) Router() chi.Router {
 	r := chi.NewRouter()
 
 	r.Use(h.LoggingMiddleware)
+	r.Use(h.authentication)
 	r.Use(ungzipMiddleware)
 	r.Use(gzipMiddleware)
 
@@ -36,6 +36,7 @@ func (h *MyHandler) Router() chi.Router {
 	r.Get("/{id}", h.GetShortURL)
 	r.Get("/", h.GetRoot)
 	r.Get("/ping", h.CheckConnectionDB)
+	r.Get("/api/user/urls", h.GetAllUserURLs)
 
 	return r
 }
@@ -48,6 +49,11 @@ func (h *MyHandler) GetRoot(rw http.ResponseWriter, req *http.Request) {
 
 func (h *MyHandler) CreateShortURLJSON(rw http.ResponseWriter, req *http.Request) {
 	if req.Method == http.MethodPost {
+		userID, ok := req.Context().Value(userIDKey).(string)
+		if !ok {
+			http.Error(rw, "Internal server error", http.StatusInternalServerError)
+			return
+		}
 		rw.Header().Set("Content-Type", "application/json")
 
 		ctx := req.Context()
@@ -70,7 +76,7 @@ func (h *MyHandler) CreateShortURLJSON(rw http.ResponseWriter, req *http.Request
 
 		var resp model.Response
 
-		savedToken, err := h.Storage.Save(ctx, token, rq.URL)
+		savedToken, err := h.Storage.Save(ctx, token, rq.URL, userID)
 		if err != nil && errors.Is(err, repository.ErrURLExists) {
 			rw.WriteHeader(http.StatusConflict)
 		} else {
@@ -92,6 +98,12 @@ func (h *MyHandler) CreateShortURLJSON(rw http.ResponseWriter, req *http.Request
 
 func (h *MyHandler) CreateShortBatch(rw http.ResponseWriter, req *http.Request) {
 	if req.Method == http.MethodPost {
+		userID, ok := req.Context().Value(userIDKey).(string)
+		if !ok {
+			http.Error(rw, "Internal server error", http.StatusInternalServerError)
+			return
+		}
+
 		ctx := req.Context()
 		ctx, cancel := context.WithTimeout(ctx, time.Second*3)
 		defer cancel()
@@ -121,7 +133,7 @@ func (h *MyHandler) CreateShortBatch(rw http.ResponseWriter, req *http.Request) 
 			respBatch = append(respBatch, model.RespBatch{ID: batch.ID, ShortURL: shortedURL})
 		}
 
-		h.Storage.SaveBatch(ctx, reqBatch)
+		h.Storage.SaveBatch(ctx, reqBatch, userID)
 
 		rw.Header().Set("Content-Type", "application/json")
 		rw.WriteHeader(http.StatusCreated)
@@ -136,6 +148,11 @@ func (h *MyHandler) CreateShortBatch(rw http.ResponseWriter, req *http.Request) 
 
 func (h *MyHandler) CreateShortURL(rw http.ResponseWriter, req *http.Request) {
 	if req.Method == http.MethodPost {
+		userID, ok := req.Context().Value(userIDKey).(string)
+		if !ok {
+			http.Error(rw, "Internal server error", http.StatusInternalServerError)
+			return
+		}
 		rw.Header().Set("content-type", "text/plain")
 
 		ctx := req.Context()
@@ -155,9 +172,13 @@ func (h *MyHandler) CreateShortURL(rw http.ResponseWriter, req *http.Request) {
 		}
 		defer req.Body.Close()
 
-		savedToken, err := h.Storage.Save(ctx, token, string(body))
+		// baseURL := h.Config.BaseURL 
+		// if !strings.HasSuffix(h.Config.BaseURL, "/") {
+		// 	baseURL = h.Config.BaseURL + "/" 
+		// } 
+
+		savedToken, err := h.Storage.Save(ctx, token, string(body), userID)
 		if err != nil {
-			fmt.Println(err)
 			if errors.Is(err, repository.ErrURLExists) {
 				rw.WriteHeader(http.StatusConflict)
 			}
@@ -199,4 +220,18 @@ func (h *MyHandler) CheckConnectionDB(rw http.ResponseWriter, req *http.Request)
 
 	rw.WriteHeader(http.StatusOK)
 	rw.Write([]byte("Database connection is success"))
+}
+
+func (h *MyHandler) GetAllUserURLs(rw http.ResponseWriter, req *http.Request) {
+	userID, ok := req.Context().Value(userIDKey).(string)
+	if !ok {
+		http.Error(rw, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	ctx := req.Context()
+	ctx, cancel := context.WithTimeout(ctx, time.Second*3)
+	defer cancel()
+
+	h.Storage.GetAllUsersURLs(ctx, userID)
 }

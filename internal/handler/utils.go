@@ -12,7 +12,7 @@ import (
 func getToken(ctx context.Context, storage repository.Storage) (string, error) {
 	const maxAttempts = 5
 	for at := 0; at < maxAttempts; at++ {
-		token, err := generateToken()
+		token, err := generateToken(8)
 		if err != nil {
 			return "", err
 		}
@@ -26,9 +26,9 @@ func getToken(ctx context.Context, storage repository.Storage) (string, error) {
 	return "", fmt.Errorf("failed to generate unique token after %d attempts", maxAttempts)
 }
 
-func generateToken() (string, error) {
+func generateToken(size int) (string, error) {
 	// Генерируем токен - id короткой ссылки
-	b := make([]byte, 8)
+	b := make([]byte, size)
 	_, err := rand.Read(b)
 	if err != nil {
 		return "", err

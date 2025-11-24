@@ -6,4 +6,5 @@ type Config struct {
 	LogLevel        string `env:"LOG_LEVEL"`
 	FileStoragePath string `env:"FILE_STORAGE_PATH"`
 	DatabaseAdr     string `env:"DATABASE_DSN"`
+	JWTSecret       string `env:"JWT_SECRET"`
 }

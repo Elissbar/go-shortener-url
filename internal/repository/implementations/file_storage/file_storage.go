@@ -76,7 +76,7 @@ func (fs *FileStorage) saveToFile() error {
 
 }
 
-func (fs *FileStorage) Save(ctx context.Context, token, url string) (string, error) {
+func (fs *FileStorage) Save(ctx context.Context, token, url, userID string) (string, error) {
 	if val, ok := fs.urlToken.Load(url); ok {
 		return val.(string), repository.ErrURLExists // Возвращаем токен, если URL уже существует
 	}
@@ -90,9 +90,9 @@ func (fs *FileStorage) Save(ctx context.Context, token, url string) (string, err
 	return token, nil
 }
 
-func (fs *FileStorage) SaveBatch(ctx context.Context, batch []model.ReqBatch) error {
+func (fs *FileStorage) SaveBatch(ctx context.Context, batch []model.ReqBatch, userID string) error {
 	for _, b := range batch {
-		fs.Save(ctx, b.Token, b.OriginalURL)
+		fs.Save(ctx, b.Token, b.OriginalURL, userID)
 	}
 	return nil
 }
@@ -102,6 +102,10 @@ func (fs *FileStorage) Get(ctx context.Context, token string) (string, bool) {
 		return val.(string), true // Возвращаем токен, если URL уже существует
 	}
 	return "", false
+}
+
+func (fs *FileStorage) GetAllUsersURLs(ctx context.Context, userID string) ([]model.URLRecord, error) {
+	return []model.URLRecord{}, nil
 }
 
 func (fs *FileStorage) Close() error {

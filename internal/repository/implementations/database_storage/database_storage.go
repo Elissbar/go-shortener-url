@@ -65,8 +65,8 @@ func (db *DBStorage) Migrate() error {
 	return nil
 }
 
-func (db *DBStorage) Save(ctx context.Context, token, url string) (string, error) {
-	_, err := db.DB.ExecContext(ctx, "INSERT INTO shorted_links (token, url) VALUES ($1, $2)", token, url)
+func (db *DBStorage) Save(ctx context.Context, token, url, userID string) (string, error) {
+	_, err := db.DB.ExecContext(ctx, "INSERT INTO shorted_links (token, url, user_id) VALUES ($1, $2, $3)", token, url, userID)
 	if err != nil {
 		var pgErr *pq.Error
 		if errors.As(err, &pgErr) && pgErr.Code == pgerrcode.UniqueViolation {
@@ -83,14 +83,14 @@ func (db *DBStorage) Save(ctx context.Context, token, url string) (string, error
 	return token, nil
 }
 
-func (db *DBStorage) SaveBatch(ctx context.Context, batch []model.ReqBatch) error {
+func (db *DBStorage) SaveBatch(ctx context.Context, batch []model.ReqBatch, userID string) error {
 	tx, err := db.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
 
 	for _, b := range batch {
-		_, err := tx.ExecContext(ctx, "INSERT INTO shorted_links (token, url) VALUES ($1, $2)", b.Token, b.OriginalURL)
+		_, err := tx.ExecContext(ctx, "INSERT INTO shorted_links (token, url) VALUES ($1, $2, $3)", b.Token, b.OriginalURL, userID)
 		if err != nil {
 			tx.Rollback()
 			return err
@@ -111,6 +111,12 @@ func (db *DBStorage) Get(ctx context.Context, token string) (string, bool) {
 	}
 	return value, true
 }
+
+func (db *DBStorage) GetAllUsersURLs(ctx context.Context, userID string) ([]model.URLRecord, error) {
+	rows := db.DB.QueryRowContext(ctx, "SELECT token, url FROM shorted_links WHERE user_id = $1", userID)
+	fmt.Println("rows here:", rows)
+	return []model.URLRecord{}, nil
+} 
 
 func (db *DBStorage) Close() error {
 	return db.DB.Close()
