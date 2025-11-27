@@ -117,6 +117,7 @@ func (db *DBStorage) GetAllUsersURLs(ctx context.Context, userID string) ([]mode
 	if err != nil {
 		return nil, err
 	}
+	rows.Err()
 	defer rows.Close()
 
 	records := []model.URLRecord{}
@@ -130,6 +131,10 @@ func (db *DBStorage) GetAllUsersURLs(ctx context.Context, userID string) ([]mode
 			return nil, err
 		}
 		records = append(records, record)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
 	}
 
 	return records, nil
