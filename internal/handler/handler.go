@@ -229,6 +229,7 @@ func (h *MyHandler) CheckConnectionDB(rw http.ResponseWriter, req *http.Request)
 }
 
 func (h *MyHandler) GetAllUserURLs(rw http.ResponseWriter, req *http.Request) {
+	rw.Header().Set("Content-Type", "application/json")
 	userID, ok := req.Context().Value(userIDKey).(string)
 	if !ok {
 		http.Error(rw, "Internal server error", http.StatusInternalServerError)

@@ -90,7 +90,7 @@ func (db *DBStorage) SaveBatch(ctx context.Context, batch []model.ReqBatch, user
 	}
 
 	for _, b := range batch {
-		_, err := tx.ExecContext(ctx, "INSERT INTO shorted_links (token, url, user_id, shorted_url) VALUES ($1, $2, $3, $4)", b.Token, b.OriginalURL, userID, baseURL + b.Token)
+		_, err := tx.ExecContext(ctx, "INSERT INTO shorted_links (token, url, user_id, shorted_url) VALUES ($1, $2, $3, $4)", b.Token, b.OriginalURL, userID, baseURL+b.Token)
 		if err != nil {
 			tx.Rollback()
 			return err
@@ -119,7 +119,6 @@ func (db *DBStorage) GetAllUsersURLs(ctx context.Context, userID string) ([]mode
 	}
 	defer rows.Close()
 
-	fmt.Println("rows here:", rows)
 	records := []model.URLRecord{}
 	for rows.Next() {
 		var record model.URLRecord
@@ -128,13 +127,13 @@ func (db *DBStorage) GetAllUsersURLs(ctx context.Context, userID string) ([]mode
 			&record.OriginalURL,
 		)
 		if err != nil {
-            return nil, err
-        }
+			return nil, err
+		}
 		records = append(records, record)
 	}
 
 	return records, nil
-} 
+}
 
 func (db *DBStorage) Close() error {
 	return db.DB.Close()
