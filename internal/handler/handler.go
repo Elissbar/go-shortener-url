@@ -216,12 +216,15 @@ func (h *MyHandler) GetShortURL(rw http.ResponseWriter, req *http.Request) {
 
 		id := chi.URLParam(req, "id")
 		url, err := h.Storage.Get(ctx, id)
-		if err == sql.ErrNoRows || err == repository.ErrTokenNotExist {
+		
+		if errors.Is(err, sql.ErrNoRows) || errors.Is(err, repository.ErrTokenNotExist) {
 			rw.WriteHeader(http.StatusNotFound)
 			rw.Write([]byte("Not Found"))
-		} else if err == repository.ErrTokenIsDeleted {
+		} else if errors.Is(err, repository.ErrTokenIsDeleted) {
 			rw.WriteHeader(http.StatusGone)
 			rw.Write([]byte("Token deleted"))
+		} else if err != nil {
+			http.Error(rw, "Internal server error", http.StatusInternalServerError)
 		} else {
 			http.Redirect(rw, req, url, http.StatusTemporaryRedirect)
 		}
@@ -279,7 +282,18 @@ func (h *MyHandler) DeleteURLs(rw http.ResponseWriter, req *http.Request) {
 	}
 	defer req.Body.Close()
 
-	h.DeleteCh <- tokens
-	rw.WriteHeader(http.StatusAccepted)
-	// h.Storage.DeleteByTokens(req.Context(), h.DeleteCh)
+	ctx, cancel := context.WithTimeout(req.Context(), 5*time.Second)
+    defer cancel()
+    
+    h.Logger.Infof("🔧 SYNC delete for %d tokens: %v", len(tokens), tokens)
+    
+    err := h.Storage.DeleteByTokens(ctx, tokens)
+    if err != nil {
+        h.Logger.Errorf("❌ Sync delete failed: %v", err)
+        http.Error(rw, err.Error(), http.StatusInternalServerError)
+        return
+    }
+    
+    h.Logger.Infof("✅ Sync delete successful")
+    rw.WriteHeader(http.StatusAccepted)
 }

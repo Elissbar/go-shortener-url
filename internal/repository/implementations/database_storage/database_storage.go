@@ -109,6 +109,9 @@ func (db *DBStorage) Get(ctx context.Context, token string) (string, error) {
 	err := row.Scan(&url, &deleted)
 
 	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return "", repository.ErrTokenNotExist
+		}
 		return "", err
 	}
 	if deleted {
@@ -148,13 +151,13 @@ func (db *DBStorage) GetAllUsersURLs(ctx context.Context, userID string) ([]mode
 
 func (db *DBStorage) DeleteByTokens(ctx context.Context, tokens []string) error {
 	if len(tokens) == 0 {
-        return nil
-    }
-    
-    // Batch update - один запрос для всех токенов
-    query := "UPDATE shorted_links SET deleted = true WHERE token = ANY($1)"
-    _, err := db.DB.ExecContext(ctx, query, pq.Array(tokens))
-    return err
+		return nil
+	}
+
+	// Batch update - один запрос для всех токенов
+	query := "UPDATE shorted_links SET deleted = true WHERE token = ANY($1)"
+	_, err := db.DB.ExecContext(ctx, query, pq.Array(tokens))
+	return err
 }
 
 func (db *DBStorage) Close() error {
