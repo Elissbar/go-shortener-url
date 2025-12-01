@@ -1,0 +1,1 @@
+ALTER TABLE shorted_links DROP COLUMN deleted;
