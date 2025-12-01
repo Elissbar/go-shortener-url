@@ -2,9 +2,9 @@ package handler
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -18,9 +18,21 @@ import (
 )
 
 type MyHandler struct {
-	Storage repository.Storage
-	Config  *config.Config
-	Logger  *zap.SugaredLogger
+	Storage  repository.Storage
+	Config   *config.Config
+	Logger   *zap.SugaredLogger
+	DeleteCh chan []string
+}
+
+func NewService(storage repository.Storage, cfg *config.Config, log *zap.SugaredLogger) *MyHandler {
+	myHandler := &MyHandler{
+		Storage:  storage,
+		Config:   cfg,
+		Logger:   log,
+		DeleteCh: make(chan []string, 1000),
+	}
+	go myHandler.processDeletions()
+	return myHandler
 }
 
 func (h *MyHandler) Router() chi.Router {
@@ -38,6 +50,7 @@ func (h *MyHandler) Router() chi.Router {
 	r.Get("/", h.GetRoot)
 	r.Get("/ping", h.CheckConnectionDB)
 	r.Get("/api/user/urls", h.GetAllUserURLs)
+	r.Delete("/api/user/urls", h.DeleteURLs)
 
 	return r
 }
@@ -132,10 +145,6 @@ func (h *MyHandler) CreateShortBatch(rw http.ResponseWriter, req *http.Request) 
 				return
 			}
 
-			// shortedURL := h.Config.BaseURL + token
-			// if !strings.HasSuffix(h.Config.BaseURL, "/") {
-			// 	shortedURL = h.Config.BaseURL + "/" + token
-			// }
 			shortedURL := baseURL + token
 			batch.Token = token
 			respBatch = append(respBatch, model.RespBatch{ID: batch.ID, ShortURL: shortedURL})
@@ -169,13 +178,13 @@ func (h *MyHandler) CreateShortURL(rw http.ResponseWriter, req *http.Request) {
 
 		token, err := getToken(ctx, h.Storage)
 		if err != nil {
-			http.Error(rw, "Error: "+err.Error(), http.StatusInternalServerError)
+			http.Error(rw, "Error 1: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
 
 		body, err := io.ReadAll(req.Body) // получаем URL для сокращения
 		if err != nil {
-			http.Error(rw, "Error: "+err.Error(), http.StatusInternalServerError)
+			http.Error(rw, "Error 2: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
 		defer req.Body.Close()
@@ -187,7 +196,6 @@ func (h *MyHandler) CreateShortURL(rw http.ResponseWriter, req *http.Request) {
 
 		savedToken, err := h.Storage.Save(ctx, token, string(body), userID, baseURL)
 		if err != nil {
-			fmt.Println("we in:", err.Error())
 			if errors.Is(err, repository.ErrURLExists) {
 				rw.WriteHeader(http.StatusConflict)
 			}
@@ -207,10 +215,13 @@ func (h *MyHandler) GetShortURL(rw http.ResponseWriter, req *http.Request) {
 		defer cancel()
 
 		id := chi.URLParam(req, "id")
-		url, ok := h.Storage.Get(ctx, id)
-		if !ok {
+		url, err := h.Storage.Get(ctx, id)
+		if err == sql.ErrNoRows || err == repository.ErrTokenNotExist {
 			rw.WriteHeader(http.StatusNotFound)
 			rw.Write([]byte("Not Found"))
+		} else if err == repository.ErrTokenIsDeleted {
+			rw.WriteHeader(http.StatusGone)
+			rw.Write([]byte("Token deleted"))
 		} else {
 			http.Redirect(rw, req, url, http.StatusTemporaryRedirect)
 		}
@@ -255,4 +266,20 @@ func (h *MyHandler) GetAllUserURLs(rw http.ResponseWriter, req *http.Request) {
 		http.Error(rw, "Error: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
+}
+
+func (h *MyHandler) DeleteURLs(rw http.ResponseWriter, req *http.Request) {
+	rw.Header().Set("Content-Type", "application/json")
+
+	var tokens []string
+	dec := json.NewDecoder(req.Body)
+	if err := dec.Decode(&tokens); err != nil {
+		http.Error(rw, "Error: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer req.Body.Close()
+
+	h.DeleteCh <- tokens
+	rw.WriteHeader(http.StatusAccepted)
+	// h.Storage.DeleteByTokens(req.Context(), h.DeleteCh)
 }

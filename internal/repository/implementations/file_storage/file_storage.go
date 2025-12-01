@@ -97,16 +97,18 @@ func (fs *FileStorage) SaveBatch(ctx context.Context, batch []model.ReqBatch, us
 	return nil
 }
 
-func (fs *FileStorage) Get(ctx context.Context, token string) (string, bool) {
+func (fs *FileStorage) Get(ctx context.Context, token string) (string, error) {
 	if val, ok := fs.tokenURL.Load(token); ok {
-		return val.(string), true // Возвращаем токен, если URL уже существует
+		return val.(string), nil // Возвращаем токен, если URL уже существует
 	}
-	return "", false
+	return "", repository.ErrTokenNotExist
 }
 
 func (fs *FileStorage) GetAllUsersURLs(ctx context.Context, userID string) ([]model.URLRecord, error) {
 	return []model.URLRecord{}, nil
 }
+
+func (fs *FileStorage) DeleteByTokens(ctx context.Context, tokens []string) error {return nil}
 
 func (fs *FileStorage) Close() error {
 	return nil

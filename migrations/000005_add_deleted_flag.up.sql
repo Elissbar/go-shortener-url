@@ -1,0 +1,1 @@
+ALTER TABLE shorted_links ADD COLUMN deleted BOOLEAN DEFAULT FALSE;

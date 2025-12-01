@@ -37,16 +37,18 @@ func (ms *MemoryStorage) SaveBatch(ctx context.Context, batch []model.ReqBatch, 
 	return nil
 }
 
-func (ms *MemoryStorage) Get(ctx context.Context, token string) (string, bool) {
+func (ms *MemoryStorage) Get(ctx context.Context, token string) (string, error) {
 	if val, ok := ms.TokenURL.Load(token); ok {
-		return val.(string), true // Возвращаем токен, если URL уже существует
+		return val.(string), nil // Возвращаем токен, если URL уже существует
 	}
-	return "", false
+	return "", repository.ErrTokenNotExist
 }
 
 func (ms *MemoryStorage) GetAllUsersURLs(ctx context.Context, userID string) ([]model.URLRecord, error) {
 	return []model.URLRecord{}, nil
 }
+
+func (ms *MemoryStorage) DeleteByTokens(ctx context.Context, tokens []string) error {return nil}
 
 func (ms *MemoryStorage) Close() error { return nil }
 

@@ -101,15 +101,21 @@ func (db *DBStorage) SaveBatch(ctx context.Context, batch []model.ReqBatch, user
 	return nil
 }
 
-func (db *DBStorage) Get(ctx context.Context, token string) (string, bool) {
-	row := db.DB.QueryRowContext(ctx, "SELECT url FROM shorted_links WHERE token = $1", token)
+func (db *DBStorage) Get(ctx context.Context, token string) (string, error) {
+	row := db.DB.QueryRowContext(ctx, "SELECT url, deleted FROM shorted_links WHERE token = $1", token)
 
-	var value string
-	err := row.Scan(&value)
+	var url string
+	var deleted bool
+	err := row.Scan(&url, &deleted)
+
 	if err != nil {
-		return "", false
+		return "", err
 	}
-	return value, true
+	if deleted {
+		return url, repository.ErrTokenIsDeleted
+	}
+
+	return url, nil
 }
 
 func (db *DBStorage) GetAllUsersURLs(ctx context.Context, userID string) ([]model.URLRecord, error) {
@@ -138,6 +144,17 @@ func (db *DBStorage) GetAllUsersURLs(ctx context.Context, userID string) ([]mode
 	}
 
 	return records, nil
+}
+
+func (db *DBStorage) DeleteByTokens(ctx context.Context, tokens []string) error {
+	if len(tokens) == 0 {
+        return nil
+    }
+    
+    // Batch update - один запрос для всех токенов
+    query := "UPDATE shorted_links SET deleted = true WHERE token = ANY($1)"
+    _, err := db.DB.ExecContext(ctx, query, pq.Array(tokens))
+    return err
 }
 
 func (db *DBStorage) Close() error {

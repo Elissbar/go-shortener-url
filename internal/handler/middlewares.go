@@ -6,13 +6,13 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/google/uuid"
 )
 
 type contextKey string
+
 const userIDKey contextKey = "user_id"
 
 // Кастомный ResponseWriter для gzip
@@ -80,10 +80,10 @@ func ungzipMiddleware(next http.Handler) http.Handler {
 
 func (h *MyHandler) LoggingMiddleware(handler http.Handler) http.Handler {
 	logFn := func(w http.ResponseWriter, r *http.Request) {
-		startTime := time.Now()
+		// startTime := time.Now()
 
-		uri := r.RequestURI
-		metnod := r.Method
+		// uri := r.RequestURI
+		// metnod := r.Method
 
 		lw := responseWriter{
 			ResponseWriter: w,
@@ -92,15 +92,15 @@ func (h *MyHandler) LoggingMiddleware(handler http.Handler) http.Handler {
 
 		handler.ServeHTTP(&lw, r)
 
-		duration := time.Since(startTime)
+		// duration := time.Since(startTime)
 
-		h.Logger.Infow("Request/Response data: ",
-			"uri", uri,
-			"method", metnod,
-			"status", lw.responseData.status,
-			"duration", int(duration),
-			"size", lw.responseData.size,
-		)
+		// h.Logger.Infow("Request/Response data: ",
+		// 	"uri", uri,
+		// 	"method", metnod,
+		// 	"status", lw.responseData.status,
+		// 	"duration", int(duration),
+		// 	"size", lw.responseData.size,
+		// )
 	}
 
 	return http.HandlerFunc(logFn)
@@ -117,7 +117,6 @@ func (h *MyHandler) authentication(next http.Handler) http.Handler {
 		cookie, err := r.Cookie("user_id")
 
 		if err != nil || cookie.Value == "" {
-			fmt.Println("Куки нет, или она пустая", cookie)
 			cookie, userIDStr, err := generateAuthToken(h.Config.JWTSecret)
 			if err != nil {
 				http.Error(w, "Authorization required", http.StatusUnauthorized)
@@ -126,7 +125,6 @@ func (h *MyHandler) authentication(next http.Handler) http.Handler {
 			userID = userIDStr
 			http.SetCookie(w, cookie)
 		} else {
-			fmt.Println("Куки есть", cookie)
 			userID, err = verifyAuthToken(cookie.Value, h.Config.JWTSecret)
 			if err != nil {
 				fmt.Println("Ошибка при проверке валидации куки")
