@@ -24,6 +24,8 @@ func getToken(ctx context.Context, storage repository.Storage) (string, error) {
 		_, err = storage.Get(ctx, token)
 		if err == sql.ErrNoRows {
 			return token, nil
+		} else if err == repository.ErrTokenNotExist {
+			return token, nil
 		} else if err != nil {
 			return "", err
 		}
