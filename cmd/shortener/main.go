@@ -21,7 +21,7 @@ func main() {
 	}
 	defer log.Sync()
 
-	storage, err := patterns.NewStorage(cfg)
+	storage, err := patterns.NewStorage(cfg, log)
 	if err != nil {
 		panic(err)
 	}

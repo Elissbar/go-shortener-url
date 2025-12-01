@@ -12,6 +12,7 @@ import (
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database/postgres"
 	"github.com/jackc/pgerrcode"
+	"go.uber.org/zap"
 
 	"github.com/lib/pq"
 
@@ -21,9 +22,10 @@ import (
 type DBStorage struct {
 	DB             *sql.DB
 	connectionData string
+	Logger         *zap.SugaredLogger
 }
 
-func NewDatabaseStorage(connectionData string) (*DBStorage, error) {
+func NewDatabaseStorage(connectionData string, log *zap.SugaredLogger) (*DBStorage, error) {
 	db, err := sql.Open("postgres", connectionData)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open database: %w", err)
@@ -33,7 +35,7 @@ func NewDatabaseStorage(connectionData string) (*DBStorage, error) {
 		return nil, fmt.Errorf("failed to ping database: %w", err)
 	}
 
-	storage := &DBStorage{DB: db, connectionData: connectionData}
+	storage := &DBStorage{DB: db, connectionData: connectionData, Logger: log}
 
 	// ВТОРОЕ: применяем миграции
 	if err := storage.Migrate(); err != nil {
@@ -154,10 +156,15 @@ func (db *DBStorage) DeleteByTokens(ctx context.Context, tokens []string) error 
 		return nil
 	}
 
-	// Batch update - один запрос для всех токенов
 	query := "UPDATE shorted_links SET deleted = true WHERE token = ANY($1)"
-	_, err := db.DB.ExecContext(ctx, query, pq.Array(tokens))
-	return err
+	result, err := db.DB.ExecContext(ctx, query, pq.Array(tokens))
+	if err != nil {
+		return err
+	}
+
+	rows, _ := result.RowsAffected()
+	db.Logger.Infow("Database update", "affectedRows", rows, "tokenCount", len(tokens))
+	return nil
 }
 
 func (db *DBStorage) Close() error {

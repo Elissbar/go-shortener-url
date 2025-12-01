@@ -2,7 +2,6 @@ package handler
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"errors"
 	"io"
@@ -209,26 +208,35 @@ func (h *MyHandler) CreateShortURL(rw http.ResponseWriter, req *http.Request) {
 }
 
 func (h *MyHandler) GetShortURL(rw http.ResponseWriter, req *http.Request) {
-	if req.Method == http.MethodGet {
-		ctx := req.Context()
-		ctx, cancel := context.WithTimeout(ctx, time.Second*3)
-		defer cancel()
+	if req.Method != http.MethodGet {
+		return
+	}
 
-		id := chi.URLParam(req, "id")
-		url, err := h.Storage.Get(ctx, id)
-		
-		if errors.Is(err, sql.ErrNoRows) || errors.Is(err, repository.ErrTokenNotExist) {
+	id := chi.URLParam(req, "id")
+	h.Logger.Infow("GET request for token", "token", id)
+
+	ctx, cancel := context.WithTimeout(req.Context(), 3*time.Second)
+	defer cancel()
+
+	url, err := h.Storage.Get(ctx, id)
+	if err != nil {
+		if errors.Is(err, repository.ErrTokenNotExist) {
+			h.Logger.Infow("Token not found", "token", id)
 			rw.WriteHeader(http.StatusNotFound)
 			rw.Write([]byte("Not Found"))
 		} else if errors.Is(err, repository.ErrTokenIsDeleted) {
+			h.Logger.Infow("Token deleted (410)", "token", id)
 			rw.WriteHeader(http.StatusGone)
-			rw.Write([]byte("Token deleted"))
-		} else if err != nil {
-			http.Error(rw, "Internal server error", http.StatusInternalServerError)
+			rw.Write([]byte("Gone"))
 		} else {
-			http.Redirect(rw, req, url, http.StatusTemporaryRedirect)
+			h.Logger.Errorw("Error getting token", "token", id, "error", err)
+			http.Error(rw, "Internal Server Error", http.StatusInternalServerError)
 		}
+		return
 	}
+
+	h.Logger.Infow("Redirecting token", "token", id, "url", url)
+	http.Redirect(rw, req, url, http.StatusTemporaryRedirect)
 }
 
 func (h *MyHandler) CheckConnectionDB(rw http.ResponseWriter, req *http.Request) {
@@ -274,26 +282,25 @@ func (h *MyHandler) GetAllUserURLs(rw http.ResponseWriter, req *http.Request) {
 func (h *MyHandler) DeleteURLs(rw http.ResponseWriter, req *http.Request) {
 	rw.Header().Set("Content-Type", "application/json")
 
+	h.Logger.Infow("DELETE handler called", "path", req.URL.Path)
+
 	var tokens []string
-	dec := json.NewDecoder(req.Body)
-	if err := dec.Decode(&tokens); err != nil {
-		http.Error(rw, "Error: "+err.Error(), http.StatusInternalServerError)
+	if err := json.NewDecoder(req.Body).Decode(&tokens); err != nil {
+		h.Logger.Errorw("Failed to decode request body", "error", err)
+		http.Error(rw, "Invalid JSON", http.StatusBadRequest)
 		return
 	}
 	defer req.Body.Close()
 
-	ctx, cancel := context.WithTimeout(req.Context(), 5*time.Second)
-    defer cancel()
-    
-    h.Logger.Infof("🔧 SYNC delete for %d tokens: %v", len(tokens), tokens)
-    
-    err := h.Storage.DeleteByTokens(ctx, tokens)
-    if err != nil {
-        h.Logger.Errorf("❌ Sync delete failed: %v", err)
-        http.Error(rw, err.Error(), http.StatusInternalServerError)
-        return
-    }
-    
-    h.Logger.Infof("✅ Sync delete successful")
-    rw.WriteHeader(http.StatusAccepted)
+	h.Logger.Infow("Received tokens for deletion", "count", len(tokens), "tokens", tokens)
+
+	// Отправляем токены в канал для асинхронной обработки
+	select {
+	case h.DeleteCh <- tokens:
+		h.Logger.Infow("Tokens sent to processing channel", "count", len(tokens))
+		rw.WriteHeader(http.StatusAccepted)
+	default:
+		h.Logger.Warnw("Deletion channel is full", "count", len(tokens))
+		http.Error(rw, "Service busy", http.StatusServiceUnavailable)
+	}
 }

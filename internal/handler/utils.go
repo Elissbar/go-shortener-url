@@ -47,68 +47,78 @@ func generateToken(size int) (string, error) {
 }
 
 func (h *MyHandler) processDeletions() {
-	h.Logger.Info("🔄 DELETE processor started")
-    defer h.Logger.Info("🔄 DELETE processor stopped")
-	// Создаем воркеры для Fan In
-	const numWorkers = 3
-	workerChs := make([]chan string, numWorkers)
+	h.Logger.Info("Deletion processor started")
+	defer h.Logger.Info("Deletion processor stopped")
 
-	// Запускаем воркеры
-	for i := 0; i < numWorkers; i++ {
-		workerChs[i] = make(chan string, 100)
-		go h.deleteWorker(workerChs[i])
-	}
+	const bufferSize = 20 // Размер буфера перед отправкой в БД
+	const flushInterval = 100 * time.Millisecond
+	
+	buffer := make([]string, 0, bufferSize)
+	flushTimer := time.NewTicker(flushInterval)
+	defer flushTimer.Stop()
 
-	// Fan In: читаем из основного канала и распределяем по воркерам
-	for tokensBatch := range h.DeleteCh {
-		for i, token := range tokensBatch {
-			workerIndex := i % numWorkers
-			workerChs[workerIndex] <- token
+	for {
+		select {
+		case tokensBatch, ok := <-h.DeleteCh:
+			if !ok {
+				// Канал закрыт, обрабатываем остатки
+				if len(buffer) > 0 {
+					h.batchDelete(buffer)
+				}
+				return
+			}
+			
+			h.Logger.Debugw("Received batch from channel", "batchSize", len(tokensBatch))
+			
+			// Добавляем токены в буфер
+			buffer = append(buffer, tokensBatch...)
+			
+			// Если буфер заполнен - отправляем в БД
+			if len(buffer) >= bufferSize {
+				h.Logger.Debugw("Buffer full, processing", "bufferSize", len(buffer))
+				h.batchDelete(buffer[:bufferSize])
+				
+				// Оставляем остатки в буфере
+				if len(buffer) > bufferSize {
+					buffer = append([]string{}, buffer[bufferSize:]...)
+				} else {
+					buffer = buffer[:0]
+				}
+			}
+
+		case <-flushTimer.C:
+			// По таймеру отправляем то, что накопилось
+			if len(buffer) > 0 {
+				h.Logger.Debugw("Timer flush", "bufferSize", len(buffer))
+				h.batchDelete(buffer)
+				buffer = buffer[:0]
+			}
 		}
 	}
-
-	// Закрываем каналы воркеров при завершении
-	for _, ch := range workerChs {
-		close(ch)
-	}
-}
-
-func (h *MyHandler) deleteWorker(tokenCh chan string) {
-    h.Logger.Info("👷 DELETE worker started")
-    defer h.Logger.Info("👷 DELETE worker stopped")
-    
-    buffer := make([]string, 0, 2)
-    
-    for token := range tokenCh {
-        h.Logger.Debugf("📥 Worker received token: %s", token)
-        buffer = append(buffer, token)
-        
-        if len(buffer) >= 2 {
-            h.Logger.Infof("📦 Buffer full (%d), processing...", len(buffer))
-            h.batchDelete(buffer)
-            buffer = buffer[:0]
-        }
-    }
-    
-    if len(buffer) > 0 {
-        h.Logger.Infof("📦 Processing remaining %d tokens", len(buffer))
-        h.batchDelete(buffer)
-    }
 }
 
 func (h *MyHandler) batchDelete(tokens []string) {
-    h.Logger.Infof("💾 Batch delete for tokens: %v", tokens)
-    
-    ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-    defer cancel()
-    
-    start := time.Now()
-    err := h.Storage.DeleteByTokens(ctx, tokens)
-    elapsed := time.Since(start)
-    
-    if err != nil {
-        h.Logger.Errorf("❌ Batch delete failed: %v (took %v)", err, elapsed)
-    } else {
-        h.Logger.Infof("✅ Batch delete successful (took %v)", elapsed)
-    }
+	if len(tokens) == 0 {
+		return
+	}
+
+	startTime := time.Now()
+	h.Logger.Infow("Starting batch delete", "tokenCount", len(tokens), "tokens", tokens)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	err := h.Storage.DeleteByTokens(ctx, tokens)
+	elapsed := time.Since(startTime)
+
+	if err != nil {
+		h.Logger.Errorw("Batch delete failed", 
+			"tokenCount", len(tokens), 
+			"error", err, 
+			"duration", elapsed)
+	} else {
+		h.Logger.Infow("Batch delete successful", 
+			"tokenCount", len(tokens), 
+			"duration", elapsed)
+	}
 }
