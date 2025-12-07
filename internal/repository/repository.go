@@ -11,7 +11,7 @@ type Storage interface {
 	SaveBatch(ctx context.Context, batch []model.ReqBatch, userID, baseURL string) error
 	Get(ctx context.Context, token string) (string, error)
 	GetAllUsersURLs(ctx context.Context, userID string) ([]model.URLRecord, error)
-	DeleteByTokens(ctx context.Context, tokens []string) error
+	DeleteByTokens(ctx context.Context, userID string, tokens []string) error
 	Close() error
 	Ping() error
 }

@@ -12,25 +12,25 @@ import (
 	"github.com/Elissbar/go-shortener-url/internal/config"
 	"github.com/Elissbar/go-shortener-url/internal/model"
 	"github.com/Elissbar/go-shortener-url/internal/repository"
+	"github.com/Elissbar/go-shortener-url/internal/service"
 	"github.com/go-chi/chi/v5"
 	"go.uber.org/zap"
 )
 
 type MyHandler struct {
-	Storage  repository.Storage
-	Config   *config.Config
-	Logger   *zap.SugaredLogger
-	DeleteCh chan []string
+	Storage repository.Storage
+	Config  *config.Config
+	Logger  *zap.SugaredLogger
+	Service *service.Service
 }
 
-func NewService(storage repository.Storage, cfg *config.Config, log *zap.SugaredLogger) *MyHandler {
+func NewHandler(storage repository.Storage, cfg *config.Config, log *zap.SugaredLogger, srvc *service.Service) *MyHandler {
 	myHandler := &MyHandler{
-		Storage:  storage,
-		Config:   cfg,
-		Logger:   log,
-		DeleteCh: make(chan []string, 1000),
+		Storage: storage,
+		Config:  cfg,
+		Logger:  log,
+		Service: srvc,
 	}
-	go myHandler.processDeletions()
 	return myHandler
 }
 
@@ -73,7 +73,7 @@ func (h *MyHandler) CreateShortURLJSON(rw http.ResponseWriter, req *http.Request
 		ctx, cancel := context.WithTimeout(ctx, time.Second*3)
 		defer cancel()
 
-		token, err := getToken(ctx, h.Storage)
+		token, err := h.Service.GetToken(ctx)
 		if err != nil {
 			http.Error(rw, "Error: "+err.Error(), http.StatusInternalServerError)
 			return
@@ -138,7 +138,7 @@ func (h *MyHandler) CreateShortBatch(rw http.ResponseWriter, req *http.Request) 
 		var respBatch []model.RespBatch
 		for i := range len(reqBatch) {
 			batch := &reqBatch[i]
-			token, err := getToken(ctx, h.Storage)
+			token, err := h.Service.GetToken(ctx)
 			if err != nil {
 				http.Error(rw, "Error: "+err.Error(), http.StatusInternalServerError)
 				return
@@ -175,7 +175,7 @@ func (h *MyHandler) CreateShortURL(rw http.ResponseWriter, req *http.Request) {
 		ctx, cancel := context.WithTimeout(ctx, time.Second*3)
 		defer cancel()
 
-		token, err := getToken(ctx, h.Storage)
+		token, err := h.Service.GetToken(ctx)
 		if err != nil {
 			http.Error(rw, "Error 1: "+err.Error(), http.StatusInternalServerError)
 			return
@@ -280,27 +280,46 @@ func (h *MyHandler) GetAllUserURLs(rw http.ResponseWriter, req *http.Request) {
 }
 
 func (h *MyHandler) DeleteURLs(rw http.ResponseWriter, req *http.Request) {
+	userID, ok := req.Context().Value(userIDKey).(string)
+	if !ok || userID == "" {
+		h.Logger.Errorw("User ID not found in context")
+		http.Error(rw, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+	
 	rw.Header().Set("Content-Type", "application/json")
-
-	h.Logger.Infow("DELETE handler called", "path", req.URL.Path)
+	h.Logger.Infow("DELETE handler called", "path", req.URL.Path, "userID", userID)
 
 	var tokens []string
 	if err := json.NewDecoder(req.Body).Decode(&tokens); err != nil {
-		h.Logger.Errorw("Failed to decode request body", "error", err)
+		h.Logger.Errorw("Failed to decode request body", "error", err, "userID", userID)
 		http.Error(rw, "Invalid JSON", http.StatusBadRequest)
 		return
 	}
 	defer req.Body.Close()
 
-	h.Logger.Infow("Received tokens for deletion", "count", len(tokens), "tokens", tokens)
+	h.Logger.Infow("Received tokens for deletion", 
+		"userID", userID,
+		"count", len(tokens), 
+		"tokens", tokens)
 
-	// Отправляем токены в канал для асинхронной обработки
+	// Создаем запрос с userID
+	deleteReq := service.DeleteRequest{
+		UserID: userID,
+		Tokens: tokens,
+	}
+
+	// Отправляем запрос в канал для асинхронной обработки
 	select {
-	case h.DeleteCh <- tokens:
-		h.Logger.Infow("Tokens sent to processing channel", "count", len(tokens))
+	case h.Service.DeleteCh <- deleteReq:
+		h.Logger.Infow("Delete request sent to processing channel", 
+			"userID", userID,
+			"count", len(tokens))
 		rw.WriteHeader(http.StatusAccepted)
 	default:
-		h.Logger.Warnw("Deletion channel is full", "count", len(tokens))
+		h.Logger.Warnw("Deletion channel is full", 
+			"userID", userID,
+			"count", len(tokens))
 		http.Error(rw, "Service busy", http.StatusServiceUnavailable)
 	}
 }

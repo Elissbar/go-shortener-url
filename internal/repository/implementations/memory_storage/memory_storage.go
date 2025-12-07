@@ -48,7 +48,7 @@ func (ms *MemoryStorage) GetAllUsersURLs(ctx context.Context, userID string) ([]
 	return []model.URLRecord{}, nil
 }
 
-func (ms *MemoryStorage) DeleteByTokens(ctx context.Context, tokens []string) error {return nil}
+func (ms *MemoryStorage) DeleteByTokens(ctx context.Context, userID string, tokens []string) error {return nil}
 
 func (ms *MemoryStorage) Close() error { return nil }
 
