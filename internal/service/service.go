@@ -25,7 +25,7 @@ func NewService(log *zap.SugaredLogger, storage repository.Storage) *Service {
 	return &Service{
 		logger:   log,
 		storage:  storage,
-		DeleteCh: make(chan DeleteRequest),
+		DeleteCh: make(chan DeleteRequest, 1000),
 	}
 }
 
@@ -63,96 +63,46 @@ func (s *Service) GenerateToken(size int) (string, error) {
 	return token, nil
 }
 
+// Более простая реализация
 func (s *Service) ProcessDeletions() {
 	s.logger.Info("Deletion processor started")
 	defer s.logger.Info("Deletion processor stopped")
 
-	const bufferSize = 20
-	const flushInterval = 100 * time.Millisecond
-
-	// Создаем буфер для DeleteRequest
-	buffer := make(map[string][]string) // userID -> tokens
-	totalTokens := 0
-	flushTimer := time.NewTicker(flushInterval)
-	defer flushTimer.Stop()
-
-	for {
-		select {
-		case deleteReq, ok := <-s.DeleteCh:
-			if !ok {
-				// Канал закрыт, обрабатываем остатки
-				s.flushBuffer(buffer)
-				return
-			}
-
-			s.logger.Debugw("Received delete request", 
-				"userID", deleteReq.UserID, 
-				"batchSize", len(deleteReq.Tokens))
-
-			// Добавляем токены в буфер для этого пользователя
-			buffer[deleteReq.UserID] = append(buffer[deleteReq.UserID], deleteReq.Tokens...)
-			totalTokens += len(deleteReq.Tokens)
-
-			// Если буфер заполнен - отправляем в БД
-			if totalTokens >= bufferSize {
-				s.logger.Debugw("Buffer full, processing", 
-					"totalTokens", totalTokens,
-					"users", len(buffer))
-				s.flushBuffer(buffer)
-				buffer = make(map[string][]string)
-				totalTokens = 0
-			}
-
-		case <-flushTimer.C:
-			// По таймеру отправляем то, что накопилось
-			if totalTokens > 0 {
-				s.logger.Debugw("Timer flush", 
-					"totalTokens", totalTokens,
-					"users", len(buffer))
-				s.flushBuffer(buffer)
-				buffer = make(map[string][]string)
-				totalTokens = 0
-			}
-		}
+	// Создаем пул воркеров
+	numWorkers := 5
+	for i := 0; i < numWorkers; i++ {
+		go s.deletionWorker(i)
 	}
 }
 
-func (s *Service) flushBuffer(buffer map[string][]string) {
-	startTime := time.Now()
-	
-	for userID, tokens := range buffer {
-		if len(tokens) == 0 {
+func (s *Service) deletionWorker(workerID int) {
+	for deleteReq := range s.DeleteCh {
+		if len(deleteReq.Tokens) == 0 {
 			continue
 		}
-		
-		// Удаляем дубликаты токенов для одного пользователя
-		uniqueTokens := s.removeDuplicates(tokens)
-		
-		s.logger.Debugw("Processing user deletion", 
-			"userID", userID,
-			"tokenCount", len(uniqueTokens))
-		
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		err := s.storage.DeleteByTokens(ctx, userID, uniqueTokens)
+
+		// Удаляем дубликаты
+		uniqueTokens := s.removeDuplicates(deleteReq.Tokens)
+
+		// Быстрое выполнение без буферизации
+		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+		err := s.storage.DeleteByTokens(ctx, deleteReq.UserID, uniqueTokens)
 		cancel()
-		
+
 		if err != nil {
-			s.logger.Errorw("Failed to delete URLs for user",
-				"userID", userID,
+			s.logger.Errorw("Deletion failed",
+				"workerID", workerID,
+				"userID", deleteReq.UserID,
 				"tokenCount", len(uniqueTokens),
 				"error", err)
 		}
 	}
-	
-	s.logger.Infow("Buffer flushed", 
-		"duration", time.Since(startTime),
-		"totalUsers", len(buffer))
 }
 
 func (s *Service) removeDuplicates(tokens []string) []string {
 	seen := make(map[string]bool)
 	result := []string{}
-	
+
 	for _, token := range tokens {
 		if !seen[token] {
 			seen[token] = true

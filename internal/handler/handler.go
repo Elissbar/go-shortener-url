@@ -282,44 +282,41 @@ func (h *MyHandler) GetAllUserURLs(rw http.ResponseWriter, req *http.Request) {
 func (h *MyHandler) DeleteURLs(rw http.ResponseWriter, req *http.Request) {
 	userID, ok := req.Context().Value(userIDKey).(string)
 	if !ok || userID == "" {
-		h.Logger.Errorw("User ID not found in context")
 		http.Error(rw, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 	
-	rw.Header().Set("Content-Type", "application/json")
-	h.Logger.Infow("DELETE handler called", "path", req.URL.Path, "userID", userID)
-
 	var tokens []string
 	if err := json.NewDecoder(req.Body).Decode(&tokens); err != nil {
-		h.Logger.Errorw("Failed to decode request body", "error", err, "userID", userID)
 		http.Error(rw, "Invalid JSON", http.StatusBadRequest)
 		return
 	}
 	defer req.Body.Close()
-
-	h.Logger.Infow("Received tokens for deletion", 
-		"userID", userID,
-		"count", len(tokens), 
-		"tokens", tokens)
-
-	// Создаем запрос с userID
+	
+	// Валидация токенов
+	if len(tokens) == 0 {
+		rw.WriteHeader(http.StatusAccepted)
+		return
+	}
+	
+	// Создаем запрос
 	deleteReq := service.DeleteRequest{
 		UserID: userID,
 		Tokens: tokens,
 	}
-
-	// Отправляем запрос в канал для асинхронной обработки
+	
+	// Пытаемся отправить с таймаутом
+	timeout := time.After(100 * time.Millisecond)
 	select {
 	case h.Service.DeleteCh <- deleteReq:
-		h.Logger.Infow("Delete request sent to processing channel", 
-			"userID", userID,
-			"count", len(tokens))
 		rw.WriteHeader(http.StatusAccepted)
-	default:
-		h.Logger.Warnw("Deletion channel is full", 
-			"userID", userID,
-			"count", len(tokens))
-		http.Error(rw, "Service busy", http.StatusServiceUnavailable)
+	case <-timeout:
+		// Если канал полон, ждем с таймаутом
+		select {
+		case h.Service.DeleteCh <- deleteReq:
+			rw.WriteHeader(http.StatusAccepted)
+		case <-time.After(500 * time.Millisecond):
+			http.Error(rw, "Service busy", http.StatusServiceUnavailable)
+		}
 	}
 }
