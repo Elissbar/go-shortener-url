@@ -2,10 +2,12 @@ package main
 
 import (
 	"net/http"
+	"reflect"
 
 	"github.com/Elissbar/go-shortener-url/internal/handler"
 	"github.com/Elissbar/go-shortener-url/internal/logger"
 	"github.com/Elissbar/go-shortener-url/internal/repository/patterns"
+	"github.com/Elissbar/go-shortener-url/internal/service"
 )
 
 func main() {
@@ -20,17 +22,18 @@ func main() {
 	}
 	defer log.Sync()
 
-	storage, err := patterns.NewStorage(cfg)
+	storage, err := patterns.NewStorage(cfg, log)
 	if err != nil {
 		panic(err)
 	}
 	defer storage.Close()
+	log.Infow("Storage type:",
+		"type", reflect.TypeOf(storage),
+	)
 
-	myHandler := &handler.MyHandler{
-		Storage: storage,
-		Config:  cfg,
-		Logger:  log,
-	}
+	srvc := service.NewService(log, storage)
+	go srvc.ProcessDeletions()
+	myHandler := handler.NewHandler(storage, cfg, log, srvc)
 
 	router := myHandler.Router()
 

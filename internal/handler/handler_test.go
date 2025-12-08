@@ -13,14 +13,19 @@ import (
 	"github.com/Elissbar/go-shortener-url/internal/config"
 	"github.com/Elissbar/go-shortener-url/internal/logger"
 	"github.com/Elissbar/go-shortener-url/internal/model"
-	"github.com/Elissbar/go-shortener-url/internal/repository/implementations"
+	memorystorage "github.com/Elissbar/go-shortener-url/internal/repository/implementations/memory_storage"
+	"github.com/Elissbar/go-shortener-url/internal/service"
 	"github.com/stretchr/testify/require"
 )
 
 var myHandler MyHandler
 
 func TestMain(m *testing.M) {
-	cfg := &config.Config{"localhost:8080", "http://localhost:8080/", "info", ""}
+	cfg := &config.Config{
+		ServerURL: "localhost:8080", 
+		BaseURL: "http://localhost:8080/", 
+		LogLevel: "info",
+	}
 
 	log, err := logger.NewSugaredLogger(cfg.LogLevel)
 	if err != nil {
@@ -28,10 +33,12 @@ func TestMain(m *testing.M) {
 	}
 	defer log.Sync()
 
+	storage, _ := memorystorage.NewMemoryStorage()
 	myHandler = MyHandler{
-		Storage: &implementations.MemoryStorage{},
+		Storage: storage,
 		Config:  cfg,
 		Logger:  log,
+		Service: service.NewService(log, storage),
 	}
 
 	code := m.Run()
@@ -51,7 +58,7 @@ func TestCreateShortUrl(t *testing.T) {
 	}{
 		{
 			name:    "Create short url",
-			request: "https://practicum.yandex.ru/",
+			request: "https://practicum.yandex2.ru/",
 			want: want{
 				contentType: "text/plain",
 				statusCode:  http.StatusCreated,
@@ -59,7 +66,7 @@ func TestCreateShortUrl(t *testing.T) {
 		},
 		{
 			name:    "Create short url 2",
-			request: "https://www.google.com/",
+			request: "https://www.google2.com/",
 			want: want{
 				contentType: "text/plain",
 				statusCode:  http.StatusCreated,
@@ -75,6 +82,7 @@ func TestCreateShortUrl(t *testing.T) {
 		router.ServeHTTP(w, request)
 
 		result := w.Result()
+		defer result.Body.Close()
 
 		require.Equal(t, tt.want.statusCode, result.StatusCode)
 		require.Equal(t, tt.want.contentType, result.Header.Get("Content-Type"))
@@ -82,10 +90,6 @@ func TestCreateShortUrl(t *testing.T) {
 }
 
 func TestGetShortUrl(t *testing.T) {
-	type want struct {
-		statusCode int
-	}
-
 	tests := []struct {
 		name               string
 		id                 string
@@ -106,9 +110,9 @@ func TestGetShortUrl(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		urls := sync.Map{}
+		urls := &sync.Map{}
 		urls.Store(tt.id, tt.redirectTo)
-		myHandler.Storage = &implementations.MemoryStorage{Urls: urls}
+		myHandler.Storage = &memorystorage.MemoryStorage{TokenURL: urls, URLToken: &sync.Map{}}
 
 		request := httptest.NewRequest(http.MethodGet, "/"+tt.id, nil)
 		w := httptest.NewRecorder()
@@ -117,6 +121,7 @@ func TestGetShortUrl(t *testing.T) {
 		router.ServeHTTP(w, request)
 
 		result := w.Result()
+		defer result.Body.Close()
 		redirectedTo, _ := result.Location()
 
 		require.Equal(t, tt.expectedStatusCode, result.StatusCode)
@@ -137,7 +142,7 @@ func TestCreateShortUrlJSON(t *testing.T) {
 	}{
 		{
 			name:    "Create short url",
-			request: "https://practicum.yandex.ru/",
+			request: "https://practicum.yandex1.ru/",
 			want: want{
 				contentType: "application/json",
 				statusCode:  http.StatusCreated,
@@ -145,7 +150,7 @@ func TestCreateShortUrlJSON(t *testing.T) {
 		},
 		{
 			name:    "Create short url 2",
-			request: "https://www.google.com/",
+			request: "https://www.google1.com/",
 			want: want{
 				contentType: "application/json",
 				statusCode:  http.StatusCreated,
@@ -169,6 +174,7 @@ func TestCreateShortUrlJSON(t *testing.T) {
 		router.ServeHTTP(w, request)
 
 		result := w.Result()
+		defer result.Body.Close()
 
 		body, _ := io.ReadAll(result.Body)
 		var resp model.Response
