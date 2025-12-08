@@ -81,33 +81,17 @@ func (s *Service) deletionWorker(workerID int) {
 			continue
 		}
 
-		// Удаляем дубликаты
-		uniqueTokens := s.removeDuplicates(deleteReq.Tokens)
-
 		// Быстрое выполнение без буферизации
 		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
-		err := s.storage.DeleteByTokens(ctx, deleteReq.UserID, uniqueTokens)
+		err := s.storage.DeleteByTokens(ctx, deleteReq.UserID, deleteReq.Tokens)
 		cancel()
 
 		if err != nil {
 			s.logger.Errorw("Deletion failed",
 				"workerID", workerID,
 				"userID", deleteReq.UserID,
-				"tokenCount", len(uniqueTokens),
+				"tokenCount", len(deleteReq.Tokens),
 				"error", err)
 		}
 	}
-}
-
-func (s *Service) removeDuplicates(tokens []string) []string {
-	seen := make(map[string]bool)
-	result := []string{}
-
-	for _, token := range tokens {
-		if !seen[token] {
-			seen[token] = true
-			result = append(result, token)
-		}
-	}
-	return result
 }

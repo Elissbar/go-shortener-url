@@ -305,7 +305,6 @@ func (h *MyHandler) DeleteURLs(rw http.ResponseWriter, req *http.Request) {
 		Tokens: tokens,
 	}
 	
-	// Пытаемся отправить с таймаутом
 	timeout := time.After(100 * time.Millisecond)
 	select {
 	case h.Service.DeleteCh <- deleteReq:
