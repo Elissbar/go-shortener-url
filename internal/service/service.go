@@ -6,6 +6,8 @@ import (
 	"encoding/base64"
 	"time"
 
+	"github.com/Elissbar/go-shortener-url/internal/config"
+	"github.com/Elissbar/go-shortener-url/internal/observer"
 	"github.com/Elissbar/go-shortener-url/internal/repository"
 	"go.uber.org/zap"
 )
@@ -13,6 +15,7 @@ import (
 type Service struct {
 	logger   *zap.SugaredLogger
 	storage  repository.Storage
+	Event    *observer.Event
 	DeleteCh chan DeleteRequest
 }
 
@@ -21,10 +24,22 @@ type DeleteRequest struct {
 	Tokens []string
 }
 
-func NewService(log *zap.SugaredLogger, storage repository.Storage) *Service {
+func NewService(log *zap.SugaredLogger, storage repository.Storage, cfg *config.Config) *Service {
+	var subs []observer.Observer
+	if cfg.AuditFile != "" {
+		subs = append(subs, &observer.FileSubscriber{ID: "FileSub", FilePath: cfg.AuditFile})
+	}
+	if cfg.AuditURL != "" {
+		subs = append(subs, &observer.HTTPSubscriber{ID: "HTTPSub", URL: cfg.AuditURL})
+	}
+
+	event := observer.NewEvent()
+	event.Subscribe(subs)
+
 	return &Service{
 		logger:   log,
 		storage:  storage,
+		Event:    event,
 		DeleteCh: make(chan DeleteRequest, 1000),
 	}
 }

@@ -24,3 +24,10 @@ type RespBatch struct {
 	ID       string `json:"correlation_id"`
 	ShortURL string `json:"short_url,omitempty"`
 }
+
+type AuditRequest struct {
+	TS     int64  `json:"ts"`
+	Action string `json:"action"`
+	UserID string `json:"user_id"`
+	URL    string `json:"url"`
+}

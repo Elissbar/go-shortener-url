@@ -107,6 +107,13 @@ func (h *MyHandler) CreateShortURLJSON(rw http.ResponseWriter, req *http.Request
 			http.Error(rw, "Error: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
+
+		h.Service.Event.Update(model.AuditRequest{
+			TS: time.Now().Unix(),
+			Action: "shorten",
+			UserID: userID,
+			URL: rq.URL,
+		})
 	}
 }
 
@@ -204,11 +211,24 @@ func (h *MyHandler) CreateShortURL(rw http.ResponseWriter, req *http.Request) {
 
 		shortedURL := baseURL + savedToken
 		rw.Write([]byte(shortedURL))
+
+		h.Service.Event.Update(model.AuditRequest{
+			TS: time.Now().Unix(),
+			Action: "shorten",
+			UserID: userID,
+			URL: string(body),
+		})
 	}
 }
 
 func (h *MyHandler) GetShortURL(rw http.ResponseWriter, req *http.Request) {
 	if req.Method != http.MethodGet {
+		return
+	}
+
+	userID, ok := req.Context().Value(userIDKey).(string)
+	if !ok {
+		http.Error(rw, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 
@@ -234,6 +254,13 @@ func (h *MyHandler) GetShortURL(rw http.ResponseWriter, req *http.Request) {
 		}
 		return
 	}
+
+	h.Service.Event.Update(model.AuditRequest{
+		TS: time.Now().Unix(),
+		Action: "follow",
+		UserID: userID,
+		URL: url,
+	})
 
 	h.Logger.Infow("Redirecting token", "token", id, "url", url)
 	http.Redirect(rw, req, url, http.StatusTemporaryRedirect)

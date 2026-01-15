@@ -38,7 +38,7 @@ func TestMain(m *testing.M) {
 		Storage: storage,
 		Config:  cfg,
 		Logger:  log,
-		Service: service.NewService(log, storage),
+		Service: service.NewService(log, storage, cfg),
 	}
 
 	code := m.Run()

@@ -31,7 +31,7 @@ func main() {
 		"type", reflect.TypeOf(storage),
 	)
 
-	srvc := service.NewService(log, storage)
+	srvc := service.NewService(log, storage, cfg)
 	go srvc.ProcessDeletions()
 	myHandler := handler.NewHandler(storage, cfg, log, srvc)
 

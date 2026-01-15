@@ -2,6 +2,8 @@ package main
 
 import (
 	"flag"
+	"os"
+	"path/filepath"
 
 	"github.com/Elissbar/go-shortener-url/internal/config"
 	"github.com/caarlos0/env/v11"
@@ -14,12 +16,15 @@ func parseFlags() (*config.Config, error) {
 		return nil, err
 	}
 
-	var serverURL, baseURL, logLevel, fileStoragePath, databaseAdr string
+	var serverURL, baseURL, logLevel, fileStoragePath, databaseAdr, auditFile, auditURL string
 	flag.StringVar(&serverURL, "a", ":8080", ":<port>")
 	flag.StringVar(&baseURL, "b", "http://localhost:8080/", "Base URL for the API. Example: http://localhost:8080/")
 	flag.StringVar(&logLevel, "l", "info", "Log level. Example: info, debug, error")
 	flag.StringVar(&fileStoragePath, "f", "", "File storage path")
 	flag.StringVar(&databaseAdr, "d", "", "Database connection string")
+	flag.StringVar(&auditFile, "audit-file", "", "File path for audit")
+	flag.StringVar(&auditURL, "audit-url", "", "URL for audit")
+
 	// flag.StringVar(&fileStoragePath, "f", "/tmp/links.json", "File storage path")
 	// flag.StringVar(&databaseAdr, "d", "postgres://postgres:12345@localhost:5432/shorted_links?sslmode=disable", "Database connection string")
 	flag.Parse()
@@ -38,6 +43,14 @@ func parseFlags() (*config.Config, error) {
 	}
 	if cfg.DatabaseAdr == "" {
 		cfg.DatabaseAdr = databaseAdr
+	}
+	if cfg.AuditFile == "" && auditFile != "" {
+		dir, err := os.Getwd()
+		if err != nil { return nil, err }
+		cfg.AuditFile = filepath.Join(dir, auditFile)
+	}
+	if cfg.AuditURL == "" {
+		cfg.AuditURL = auditURL
 	}
 
 	return &cfg, nil
