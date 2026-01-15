@@ -28,7 +28,8 @@ func (h *HTTPSubscriber) Update(message model.AuditRequest) error {
 	}
 	fmt.Println("Client created")
 
-	_, err = client.Do(req)
+	resp, err := client.Do(req)
+	resp.Body.Close()
 	return err
 }
 
