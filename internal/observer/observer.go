@@ -29,12 +29,6 @@ func NewEvent() *Event {
 }
 
 func (e *Event) Subscribe(sub Observer) {
-	// for _, sub := range subs {
-	// 	subName := sub.GetID()
-	// 	if _, ok := e.Subscribers[subName]; !ok {
-	// 		e.Subscribers[subName] = sub
-	// 	}
-	// }
 	subName := sub.GetID()
 	if _, ok := e.Subscribers[subName]; !ok {
 		e.Subscribers[subName] = sub

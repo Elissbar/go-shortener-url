@@ -41,7 +41,7 @@ func NewService() *Service {
 	}
 	defer log.Sync()
 
-	storage, err := patterns.NewStorage(cfg, log)
+	storage, err := patterns.NewStorage(log, cfg.DatabaseAdr, cfg.FileStoragePath)
 	if err != nil {
 		panic(err)
 	}
