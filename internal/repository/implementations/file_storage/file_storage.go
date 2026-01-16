@@ -110,10 +110,3 @@ func (fs *FileStorage) GetAllUsersURLs(ctx context.Context, userID string) ([]mo
 
 func (fs *FileStorage) DeleteByTokens(ctx context.Context, userID string, tokens []string) error {return nil}
 
-func (fs *FileStorage) Close() error {
-	return nil
-}
-
-func (fs *FileStorage) Ping() error {
-	return nil
-}

@@ -176,10 +176,3 @@ func (db *DBStorage) DeleteByTokens(ctx context.Context, userID string, tokens [
     return nil
 }
 
-func (db *DBStorage) Close() error {
-	return db.DB.Close()
-}
-
-func (db *DBStorage) Ping() error {
-	return db.DB.Ping()
-}

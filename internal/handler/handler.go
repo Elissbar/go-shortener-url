@@ -9,26 +9,21 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Elissbar/go-shortener-url/internal/config"
 	"github.com/Elissbar/go-shortener-url/internal/model"
 	"github.com/Elissbar/go-shortener-url/internal/repository"
 	"github.com/Elissbar/go-shortener-url/internal/service"
 	"github.com/go-chi/chi/v5"
-	"go.uber.org/zap"
 )
 
 type MyHandler struct {
-	Storage repository.Storage
-	Config  *config.Config
-	Logger  *zap.SugaredLogger
+	// Storage repository.Storage
+	// Config  *config.Config
+	// Logger  *zap.SugaredLogger
 	Service *service.Service
 }
 
-func NewHandler(storage repository.Storage, cfg *config.Config, log *zap.SugaredLogger, srvc *service.Service) *MyHandler {
+func NewHandler(srvc *service.Service) *MyHandler {
 	myHandler := &MyHandler{
-		Storage: storage,
-		Config:  cfg,
-		Logger:  log,
 		Service: srvc,
 	}
 	return myHandler
@@ -87,12 +82,12 @@ func (h *MyHandler) CreateShortURLJSON(rw http.ResponseWriter, req *http.Request
 		}
 		defer req.Body.Close()
 
-		baseURL := h.Config.BaseURL
-		if !strings.HasSuffix(h.Config.BaseURL, "/") {
-			baseURL = h.Config.BaseURL + "/"
+		baseURL := h.Service.Config.BaseURL
+		if !strings.HasSuffix(h.Service.Config.BaseURL, "/") {
+			baseURL = h.Service.Config.BaseURL + "/"
 		}
 
-		savedToken, err := h.Storage.Save(ctx, token, rq.URL, userID, baseURL)
+		savedToken, err := h.Service.Storage.Save(ctx, token, rq.URL, userID, baseURL)
 		if err != nil && errors.Is(err, repository.ErrURLExists) {
 			rw.WriteHeader(http.StatusConflict)
 		} else {
@@ -109,10 +104,10 @@ func (h *MyHandler) CreateShortURLJSON(rw http.ResponseWriter, req *http.Request
 		}
 
 		h.Service.Event.Update(model.AuditRequest{
-			TS: time.Now().Unix(),
+			TS:     time.Now().Unix(),
 			Action: "shorten",
 			UserID: userID,
-			URL: rq.URL,
+			URL:    rq.URL,
 		})
 	}
 }
@@ -137,9 +132,9 @@ func (h *MyHandler) CreateShortBatch(rw http.ResponseWriter, req *http.Request) 
 			return
 		}
 
-		baseURL := h.Config.BaseURL
-		if !strings.HasSuffix(h.Config.BaseURL, "/") {
-			baseURL = h.Config.BaseURL + "/"
+		baseURL := h.Service.Config.BaseURL
+		if !strings.HasSuffix(h.Service.Config.BaseURL, "/") {
+			baseURL = h.Service.Config.BaseURL + "/"
 		}
 
 		var respBatch []model.RespBatch
@@ -156,7 +151,7 @@ func (h *MyHandler) CreateShortBatch(rw http.ResponseWriter, req *http.Request) 
 			respBatch = append(respBatch, model.RespBatch{ID: batch.ID, ShortURL: shortedURL})
 		}
 
-		h.Storage.SaveBatch(ctx, reqBatch, userID, baseURL)
+		h.Service.Storage.SaveBatch(ctx, reqBatch, userID, baseURL)
 
 		rw.Header().Set("Content-Type", "application/json")
 		rw.WriteHeader(http.StatusCreated)
@@ -195,12 +190,12 @@ func (h *MyHandler) CreateShortURL(rw http.ResponseWriter, req *http.Request) {
 		}
 		defer req.Body.Close()
 
-		baseURL := h.Config.BaseURL
-		if !strings.HasSuffix(h.Config.BaseURL, "/") {
-			baseURL = h.Config.BaseURL + "/"
+		baseURL := h.Service.Config.BaseURL
+		if !strings.HasSuffix(h.Service.Config.BaseURL, "/") {
+			baseURL = h.Service.Config.BaseURL + "/"
 		}
 
-		savedToken, err := h.Storage.Save(ctx, token, string(body), userID, baseURL)
+		savedToken, err := h.Service.Storage.Save(ctx, token, string(body), userID, baseURL)
 		if err != nil {
 			if errors.Is(err, repository.ErrURLExists) {
 				rw.WriteHeader(http.StatusConflict)
@@ -213,10 +208,10 @@ func (h *MyHandler) CreateShortURL(rw http.ResponseWriter, req *http.Request) {
 		rw.Write([]byte(shortedURL))
 
 		h.Service.Event.Update(model.AuditRequest{
-			TS: time.Now().Unix(),
+			TS:     time.Now().Unix(),
 			Action: "shorten",
 			UserID: userID,
-			URL: string(body),
+			URL:    string(body),
 		})
 	}
 }
@@ -233,41 +228,41 @@ func (h *MyHandler) GetShortURL(rw http.ResponseWriter, req *http.Request) {
 	}
 
 	id := chi.URLParam(req, "id")
-	h.Logger.Infow("GET request for token", "token", id)
+	h.Service.Logger.Infow("GET request for token", "token", id)
 
 	ctx, cancel := context.WithTimeout(req.Context(), 3*time.Second)
 	defer cancel()
 
-	url, err := h.Storage.Get(ctx, id)
+	url, err := h.Service.Storage.Get(ctx, id)
 	if err != nil {
 		if errors.Is(err, repository.ErrTokenNotExist) {
-			h.Logger.Infow("Token not found", "token", id)
+			h.Service.Logger.Infow("Token not found", "token", id)
 			rw.WriteHeader(http.StatusNotFound)
 			rw.Write([]byte("Not Found"))
 		} else if errors.Is(err, repository.ErrTokenIsDeleted) {
-			h.Logger.Infow("Token deleted (410)", "token", id)
+			h.Service.Logger.Infow("Token deleted (410)", "token", id)
 			rw.WriteHeader(http.StatusGone)
 			rw.Write([]byte("Gone"))
 		} else {
-			h.Logger.Errorw("Error getting token", "token", id, "error", err)
+			h.Service.Logger.Errorw("Error getting token", "token", id, "error", err)
 			http.Error(rw, "Internal Server Error", http.StatusInternalServerError)
 		}
 		return
 	}
 
 	h.Service.Event.Update(model.AuditRequest{
-		TS: time.Now().Unix(),
+		TS:     time.Now().Unix(),
 		Action: "follow",
 		UserID: userID,
-		URL: url,
+		URL:    url,
 	})
 
-	h.Logger.Infow("Redirecting token", "token", id, "url", url)
+	h.Service.Logger.Infow("Redirecting token", "token", id, "url", url)
 	http.Redirect(rw, req, url, http.StatusTemporaryRedirect)
 }
 
 func (h *MyHandler) CheckConnectionDB(rw http.ResponseWriter, req *http.Request) {
-	if err := h.Storage.Ping(); err != nil {
+	if err := h.Service.Helper.Ping(); err != nil {
 		rw.WriteHeader(http.StatusInternalServerError)
 		rw.Write([]byte("Database connection is not success"))
 		return
@@ -289,7 +284,7 @@ func (h *MyHandler) GetAllUserURLs(rw http.ResponseWriter, req *http.Request) {
 	ctx, cancel := context.WithTimeout(ctx, time.Second*3)
 	defer cancel()
 
-	records, err := h.Storage.GetAllUsersURLs(ctx, userID)
+	records, err := h.Service.Storage.GetAllUsersURLs(ctx, userID)
 	if err != nil {
 		http.Error(rw, "Internal server error", http.StatusInternalServerError)
 		return
@@ -312,26 +307,26 @@ func (h *MyHandler) DeleteURLs(rw http.ResponseWriter, req *http.Request) {
 		http.Error(rw, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
-	
+
 	var tokens []string
 	if err := json.NewDecoder(req.Body).Decode(&tokens); err != nil {
 		http.Error(rw, "Invalid JSON", http.StatusBadRequest)
 		return
 	}
 	defer req.Body.Close()
-	
+
 	// Валидация токенов
 	if len(tokens) == 0 {
 		rw.WriteHeader(http.StatusAccepted)
 		return
 	}
-	
+
 	// Создаем запрос
 	deleteReq := service.DeleteRequest{
 		UserID: userID,
 		Tokens: tokens,
 	}
-	
+
 	timeout := time.After(100 * time.Millisecond)
 	select {
 	case h.Service.DeleteCh <- deleteReq:

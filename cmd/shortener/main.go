@@ -2,40 +2,18 @@ package main
 
 import (
 	"net/http"
-	"reflect"
 
 	"github.com/Elissbar/go-shortener-url/internal/handler"
-	"github.com/Elissbar/go-shortener-url/internal/logger"
-	"github.com/Elissbar/go-shortener-url/internal/repository/patterns"
 	"github.com/Elissbar/go-shortener-url/internal/service"
 )
 
 func main() {
-	cfg, err := parseFlags()
-	if err != nil {
-		panic(err)
-	}
-
-	log, err := logger.NewSugaredLogger(cfg.LogLevel)
-	if err != nil {
-		panic(err)
-	}
-	defer log.Sync()
-
-	storage, err := patterns.NewStorage(cfg, log)
-	if err != nil {
-		panic(err)
-	}
-	defer storage.Close()
-	log.Infow("Storage type:",
-		"type", reflect.TypeOf(storage),
-	)
-
-	srvc := service.NewService(log, storage, cfg)
+	srvc := service.NewService()
 	go srvc.ProcessDeletions()
+	defer srvc.Helper.Close()
 
-	myHandler := handler.NewHandler(storage, cfg, log, srvc)
-	err = http.ListenAndServe(cfg.ServerURL, myHandler.Router())
+	myHandler := handler.NewHandler(srvc)
+	err := http.ListenAndServe(srvc.Config.ServerURL, myHandler.Router())
 	if err != nil {
 		panic(err)
 	}

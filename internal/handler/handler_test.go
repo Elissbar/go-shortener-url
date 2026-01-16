@@ -35,10 +35,11 @@ func TestMain(m *testing.M) {
 
 	storage, _ := memorystorage.NewMemoryStorage()
 	myHandler = MyHandler{
-		Storage: storage,
-		Config:  cfg,
-		Logger:  log,
-		Service: service.NewService(log, storage, cfg),
+		Service: &service.Service{
+			Storage: storage,
+			Config:  cfg,
+			Logger:  log,
+		},
 	}
 
 	code := m.Run()
@@ -112,7 +113,7 @@ func TestGetShortUrl(t *testing.T) {
 	for _, tt := range tests {
 		urls := &sync.Map{}
 		urls.Store(tt.id, tt.redirectTo)
-		myHandler.Storage = &memorystorage.MemoryStorage{TokenURL: urls, URLToken: &sync.Map{}}
+		myHandler.Service.Storage = &memorystorage.MemoryStorage{TokenURL: urls, URLToken: &sync.Map{}}
 
 		request := httptest.NewRequest(http.MethodGet, "/"+tt.id, nil)
 		w := httptest.NewRecorder()

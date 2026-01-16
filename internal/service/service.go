@@ -4,19 +4,24 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/base64"
+	"reflect"
 	"time"
 
 	"github.com/Elissbar/go-shortener-url/internal/config"
+	"github.com/Elissbar/go-shortener-url/internal/logger"
 	"github.com/Elissbar/go-shortener-url/internal/observer"
 	"github.com/Elissbar/go-shortener-url/internal/repository"
+	"github.com/Elissbar/go-shortener-url/internal/repository/patterns"
 	"go.uber.org/zap"
 )
 
 type Service struct {
-	logger   *zap.SugaredLogger
-	storage  repository.Storage
+	Config   *config.Config
+	Logger   *zap.SugaredLogger
+	Storage  repository.Storage
 	Event    *observer.Event
 	DeleteCh chan DeleteRequest
+	Helper   *Helper
 }
 
 type DeleteRequest struct {
@@ -24,7 +29,25 @@ type DeleteRequest struct {
 	Tokens []string
 }
 
-func NewService(log *zap.SugaredLogger, storage repository.Storage, cfg *config.Config) *Service {
+func NewService() *Service {
+	cfg, err := config.NewConfig()
+	if err != nil {
+		panic(err)
+	}
+
+	log, err := logger.NewSugaredLogger(cfg.LogLevel)
+	if err != nil {
+		panic(err)
+	}
+	defer log.Sync()
+
+	storage, err := patterns.NewStorage(cfg, log)
+	if err != nil {
+		panic(err)
+	}
+	
+	log.Infow("Storage type:", "type", reflect.TypeOf(storage))
+
 	var subs []observer.Observer
 	if cfg.AuditFile != "" {
 		subs = append(subs, &observer.FileSubscriber{ID: "FileSub", FilePath: cfg.AuditFile})
@@ -37,9 +60,11 @@ func NewService(log *zap.SugaredLogger, storage repository.Storage, cfg *config.
 	event.Subscribe(subs)
 
 	return &Service{
-		logger:   log,
-		storage:  storage,
+		Config:   cfg,
+		Logger:   log,
+		Storage:  storage,
 		Event:    event,
+		Helper:  &Helper{storage: &storage},
 		DeleteCh: make(chan DeleteRequest, 1000),
 	}
 }
@@ -55,7 +80,7 @@ func (s *Service) GetToken(ctx context.Context) (string, error) {
 		}
 
 		// Проверяем, свободен ли токен
-		_, err = s.storage.Get(ctx, token)
+		_, err = s.Storage.Get(ctx, token)
 		if err == repository.ErrTokenNotExist {
 			return token, nil
 		} else if err != nil {
@@ -80,8 +105,8 @@ func (s *Service) GenerateToken(size int) (string, error) {
 
 // Более простая реализация
 func (s *Service) ProcessDeletions() {
-	s.logger.Info("Deletion processor started")
-	defer s.logger.Info("Deletion processor stopped")
+	s.Logger.Info("Deletion processor started")
+	defer s.Logger.Info("Deletion processor stopped")
 
 	// Создаем пул воркеров
 	numWorkers := 5
@@ -98,11 +123,11 @@ func (s *Service) deletionWorker(workerID int) {
 
 		// Быстрое выполнение без буферизации
 		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
-		err := s.storage.DeleteByTokens(ctx, deleteReq.UserID, deleteReq.Tokens)
+		err := s.Storage.DeleteByTokens(ctx, deleteReq.UserID, deleteReq.Tokens)
 		cancel()
 
 		if err != nil {
-			s.logger.Errorw("Deletion failed",
+			s.Logger.Errorw("Deletion failed",
 				"workerID", workerID,
 				"userID", deleteReq.UserID,
 				"tokenCount", len(deleteReq.Tokens),

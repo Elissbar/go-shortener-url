@@ -117,7 +117,7 @@ func (h *MyHandler) authentication(next http.Handler) http.Handler {
 		cookie, err := r.Cookie("user_id")
 
 		if err != nil || cookie.Value == "" {
-			cookie, userIDStr, err := generateAuthToken(h.Config.JWTSecret)
+			cookie, userIDStr, err := generateAuthToken(h.Service.Config.JWTSecret)
 			if err != nil {
 				http.Error(w, "Authorization required", http.StatusUnauthorized)
 				return
@@ -125,7 +125,7 @@ func (h *MyHandler) authentication(next http.Handler) http.Handler {
 			userID = userIDStr
 			http.SetCookie(w, cookie)
 		} else {
-			userID, err = verifyAuthToken(cookie.Value, h.Config.JWTSecret)
+			userID, err = verifyAuthToken(cookie.Value, h.Service.Config.JWTSecret)
 			if err != nil {
 				fmt.Println("Ошибка при проверке валидации куки")
 				http.Error(w, "Invalid token", http.StatusUnauthorized)
