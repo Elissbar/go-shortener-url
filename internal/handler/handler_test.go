@@ -13,6 +13,7 @@ import (
 	"github.com/Elissbar/go-shortener-url/internal/config"
 	"github.com/Elissbar/go-shortener-url/internal/logger"
 	"github.com/Elissbar/go-shortener-url/internal/model"
+	"github.com/Elissbar/go-shortener-url/internal/observer"
 	memorystorage "github.com/Elissbar/go-shortener-url/internal/repository/implementations/memory_storage"
 	"github.com/Elissbar/go-shortener-url/internal/service"
 	"github.com/stretchr/testify/require"
@@ -22,9 +23,9 @@ var myHandler MyHandler
 
 func TestMain(m *testing.M) {
 	cfg := &config.Config{
-		ServerURL: "localhost:8080", 
-		BaseURL: "http://localhost:8080/", 
-		LogLevel: "info",
+		ServerURL: "localhost:8080",
+		BaseURL:   "http://localhost:8080/",
+		LogLevel:  "info",
 	}
 
 	log, err := logger.NewSugaredLogger(cfg.LogLevel)
@@ -33,12 +34,23 @@ func TestMain(m *testing.M) {
 	}
 	defer log.Sync()
 
+	event := observer.NewEvent()
+	if cfg.AuditFile != "" {
+		event.Subscribe(&observer.FileSubscriber{ID: "FileSub", FilePath: cfg.AuditFile})
+		log.Infow("Registered file audit. Audit file: " + cfg.AuditFile)
+	}
+	if cfg.AuditURL != "" {
+		event.Subscribe(&observer.HTTPSubscriber{ID: "HTTPSub", URL: cfg.AuditURL})
+		log.Infow("Registered http auditt. URL for audit: " + cfg.AuditURL)
+	}
+
 	storage, _ := memorystorage.NewMemoryStorage()
 	myHandler = MyHandler{
 		Service: &service.Service{
 			Storage: storage,
 			Config:  cfg,
 			Logger:  log,
+			Event:   event,
 		},
 	}
 

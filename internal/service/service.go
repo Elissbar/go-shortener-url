@@ -45,20 +45,18 @@ func NewService() *Service {
 	if err != nil {
 		panic(err)
 	}
-	
 	log.Infow("Storage type:", "type", reflect.TypeOf(storage))
 
-	var subs []observer.Observer
+	event := observer.NewEvent()
 	if cfg.AuditFile != "" {
-		subs = append(subs, &observer.FileSubscriber{ID: "FileSub", FilePath: cfg.AuditFile})
+		event.Subscribe(&observer.FileSubscriber{ID: "FileSub", FilePath: cfg.AuditFile})
+		log.Infow("Registered file audit. Audit file: "+cfg.AuditFile)
 	}
 	if cfg.AuditURL != "" {
-		subs = append(subs, &observer.HTTPSubscriber{ID: "HTTPSub", URL: cfg.AuditURL})
+		event.Subscribe(&observer.HTTPSubscriber{ID: "HTTPSub", URL: cfg.AuditURL})
+		log.Infow("Registered http auditt. URL for audit: "+cfg.AuditURL)
 	}
-
-	event := observer.NewEvent()
-	event.Subscribe(subs)
-
+	
 	return &Service{
 		Config:   cfg,
 		Logger:   log,
