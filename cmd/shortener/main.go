@@ -33,11 +33,9 @@ func main() {
 
 	srvc := service.NewService(log, storage, cfg)
 	go srvc.ProcessDeletions()
+
 	myHandler := handler.NewHandler(storage, cfg, log, srvc)
-
-	router := myHandler.Router()
-
-	err = http.ListenAndServe(cfg.ServerURL, router)
+	err = http.ListenAndServe(cfg.ServerURL, myHandler.Router())
 	if err != nil {
 		panic(err)
 	}
