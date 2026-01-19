@@ -79,6 +79,7 @@ func (db *DBStorage) Save(ctx context.Context, token, url, userID, baseURL strin
 				return "", err
 			}
 			return oldToken, repository.ErrURLExists
+			// return token, nil // TODO: убрать
 		}
 		return "", err
 	}
@@ -152,27 +153,27 @@ func (db *DBStorage) GetAllUsersURLs(ctx context.Context, userID string) ([]mode
 }
 
 func (db *DBStorage) DeleteByTokens(ctx context.Context, userID string, tokens []string) error {
-    if len(tokens) == 0 {
-        return nil
-    }
+	if len(tokens) == 0 {
+		return nil
+	}
 
-    // Добавляем проверку user_id
-    query := `
+	// Добавляем проверку user_id
+	query := `
         UPDATE shorted_links 
         SET deleted = true 
         WHERE token = ANY($1) 
         AND user_id = $2
     `
-    result, err := db.DB.ExecContext(ctx, query, pq.Array(tokens), userID)
-    if err != nil {
-        return err
-    }
+	result, err := db.DB.ExecContext(ctx, query, pq.Array(tokens), userID)
+	if err != nil {
+		return err
+	}
 
-    rows, _ := result.RowsAffected()
-    db.Logger.Infow("Database update", 
-        "affectedRows", rows, 
-        "tokenCount", len(tokens),
-        "userID", userID)
-    return nil
+	rows, _ := result.RowsAffected()
+	db.Logger.Infow("Database update",
+		"affectedRows", rows,
+		"tokenCount", len(tokens),
+		"userID", userID)
+	return nil
 }
 

@@ -1,12 +1,10 @@
 package handler
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/Elissbar/go-shortener-url/internal/model"
@@ -16,17 +14,13 @@ import (
 )
 
 type MyHandler struct {
-	// Storage repository.Storage
-	// Config  *config.Config
-	// Logger  *zap.SugaredLogger
 	Service *service.Service
 }
 
 func NewHandler(srvc *service.Service) *MyHandler {
-	myHandler := &MyHandler{
+	return &MyHandler{
 		Service: srvc,
 	}
-	return myHandler
 }
 
 func (h *MyHandler) Router() chi.Router {
@@ -57,16 +51,13 @@ func (h *MyHandler) GetRoot(rw http.ResponseWriter, req *http.Request) {
 
 func (h *MyHandler) CreateShortURLJSON(rw http.ResponseWriter, req *http.Request) {
 	if req.Method == http.MethodPost {
-		userID, ok := req.Context().Value(userIDKey).(string)
-		if !ok {
-			http.Error(rw, "Internal server error", http.StatusInternalServerError)
-			return
-		}
 		rw.Header().Set("Content-Type", "application/json")
 
-		ctx := req.Context()
-		ctx, cancel := context.WithTimeout(ctx, time.Second*3)
+		userID, ctx, cancel, err := prepareHandler(req)
 		defer cancel()
+		if err != nil {
+			http.Error(rw, "Internal server error", http.StatusInternalServerError)
+		}
 
 		token, err := h.Service.GetToken(ctx)
 		if err != nil {
@@ -82,10 +73,7 @@ func (h *MyHandler) CreateShortURLJSON(rw http.ResponseWriter, req *http.Request
 		}
 		defer req.Body.Close()
 
-		baseURL := h.Service.Config.BaseURL
-		if !strings.HasSuffix(h.Service.Config.BaseURL, "/") {
-			baseURL = h.Service.Config.BaseURL + "/"
-		}
+		baseURL := getFullBaseURL(h.Service.Config.BaseURL)
 
 		savedToken, err := h.Service.Storage.Save(ctx, token, rq.URL, userID, baseURL)
 		if err != nil && errors.Is(err, repository.ErrURLExists) {
@@ -103,44 +91,37 @@ func (h *MyHandler) CreateShortURLJSON(rw http.ResponseWriter, req *http.Request
 			return
 		}
 
-		h.Service.Event.Update(model.AuditRequest{
-			TS:     time.Now().Unix(),
-			Action: "shorten",
-			UserID: userID,
-			URL:    rq.URL,
-		})
+		audit(h.Service.Event, "shorten", userID, rq.URL)
 	}
 }
 
 func (h *MyHandler) CreateShortBatch(rw http.ResponseWriter, req *http.Request) {
 	if req.Method == http.MethodPost {
-		userID, ok := req.Context().Value(userIDKey).(string)
-		if !ok {
+		rw.Header().Set("Content-Type", "application/json")
+
+		userID, ctx, cancel, err := prepareHandler(req)
+		defer cancel()
+		if err != nil {
 			http.Error(rw, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 
-		ctx := req.Context()
-		ctx, cancel := context.WithTimeout(ctx, time.Second*3)
-		defer cancel()
+		body, err := io.ReadAll(req.Body)
+		if err != nil {
+			http.Error(rw, "Error 2: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
 		defer req.Body.Close()
 
 		var reqBatch []model.ReqBatch
-		dec := json.NewDecoder(req.Body)
-		if err := dec.Decode(&reqBatch); err != nil {
-			http.Error(rw, "Error: "+err.Error(), http.StatusInternalServerError)
-			return
-		}
+		err = json.Unmarshal(body, &reqBatch)
 
-		baseURL := h.Service.Config.BaseURL
-		if !strings.HasSuffix(h.Service.Config.BaseURL, "/") {
-			baseURL = h.Service.Config.BaseURL + "/"
-		}
+		baseURL := getFullBaseURL(h.Service.Config.BaseURL)
 
-		var respBatch []model.RespBatch
+		respBatch := make([]model.RespBatch, 0, len(reqBatch))
 		for i := range len(reqBatch) {
 			batch := &reqBatch[i]
-			token, err := h.Service.GetToken(ctx)
+			token, err := h.Service.GetToken(ctx) // 2.64MB
 			if err != nil {
 				http.Error(rw, "Error: "+err.Error(), http.StatusInternalServerError)
 				return
@@ -151,31 +132,33 @@ func (h *MyHandler) CreateShortBatch(rw http.ResponseWriter, req *http.Request) 
 			respBatch = append(respBatch, model.RespBatch{ID: batch.ID, ShortURL: shortedURL})
 		}
 
-		h.Service.Storage.SaveBatch(ctx, reqBatch, userID, baseURL)
-
-		rw.Header().Set("Content-Type", "application/json")
-		rw.WriteHeader(http.StatusCreated)
-
-		enc := json.NewEncoder(rw)
-		if err := enc.Encode(respBatch); err != nil {
+		data, err := json.Marshal(respBatch) // 29 sec
+		if err != nil {
 			http.Error(rw, "Error: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
+
+		err = h.Service.Storage.SaveBatch(ctx, reqBatch, userID, baseURL)
+		if err != nil {
+			http.Error(rw, "Error: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		rw.Header().Set("Content-Type", "application/json")
+		rw.WriteHeader(http.StatusCreated)
+		rw.Write(data)
 	}
 }
 
 func (h *MyHandler) CreateShortURL(rw http.ResponseWriter, req *http.Request) {
 	if req.Method == http.MethodPost {
-		userID, ok := req.Context().Value(userIDKey).(string)
-		if !ok {
-			http.Error(rw, "Internal server error", http.StatusInternalServerError)
-			return
-		}
 		rw.Header().Set("content-type", "text/plain")
 
-		ctx := req.Context()
-		ctx, cancel := context.WithTimeout(ctx, time.Second*3)
+		userID, ctx, cancel, err := prepareHandler(req)
 		defer cancel()
+		if err != nil {
+			http.Error(rw, "Internal server error", http.StatusInternalServerError)
+		}
 
 		token, err := h.Service.GetToken(ctx)
 		if err != nil {
@@ -190,10 +173,7 @@ func (h *MyHandler) CreateShortURL(rw http.ResponseWriter, req *http.Request) {
 		}
 		defer req.Body.Close()
 
-		baseURL := h.Service.Config.BaseURL
-		if !strings.HasSuffix(h.Service.Config.BaseURL, "/") {
-			baseURL = h.Service.Config.BaseURL + "/"
-		}
+		baseURL := getFullBaseURL(h.Service.Config.BaseURL)
 
 		savedToken, err := h.Service.Storage.Save(ctx, token, string(body), userID, baseURL)
 		if err != nil {
@@ -207,12 +187,7 @@ func (h *MyHandler) CreateShortURL(rw http.ResponseWriter, req *http.Request) {
 		shortedURL := baseURL + savedToken
 		rw.Write([]byte(shortedURL))
 
-		h.Service.Event.Update(model.AuditRequest{
-			TS:     time.Now().Unix(),
-			Action: "shorten",
-			UserID: userID,
-			URL:    string(body),
-		})
+		audit(h.Service.Event, "shorten", userID, string(body))
 	}
 }
 
@@ -221,17 +196,14 @@ func (h *MyHandler) GetShortURL(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	userID, ok := req.Context().Value(userIDKey).(string)
-	if !ok {
+	userID, ctx, cancel, err := prepareHandler(req)
+	defer cancel()
+	if err != nil {
 		http.Error(rw, "Internal server error", http.StatusInternalServerError)
-		return
 	}
 
 	id := chi.URLParam(req, "id")
 	h.Service.Logger.Infow("GET request for token", "token", id)
-
-	ctx, cancel := context.WithTimeout(req.Context(), 3*time.Second)
-	defer cancel()
 
 	url, err := h.Service.Storage.Get(ctx, id)
 	if err != nil {
@@ -250,12 +222,7 @@ func (h *MyHandler) GetShortURL(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	h.Service.Event.Update(model.AuditRequest{
-		TS:     time.Now().Unix(),
-		Action: "follow",
-		UserID: userID,
-		URL:    url,
-	})
+	audit(h.Service.Event, "follow", userID, url)
 
 	h.Service.Logger.Infow("Redirecting token", "token", id, "url", url)
 	http.Redirect(rw, req, url, http.StatusTemporaryRedirect)
@@ -273,16 +240,11 @@ func (h *MyHandler) CheckConnectionDB(rw http.ResponseWriter, req *http.Request)
 }
 
 func (h *MyHandler) GetAllUserURLs(rw http.ResponseWriter, req *http.Request) {
-	rw.Header().Set("Content-Type", "application/json")
-	userID, ok := req.Context().Value(userIDKey).(string)
-	if !ok {
-		http.Error(rw, "Internal server error", http.StatusInternalServerError)
-		return
-	}
-
-	ctx := req.Context()
-	ctx, cancel := context.WithTimeout(ctx, time.Second*3)
+	userID, ctx, cancel, err := prepareHandler(req)
 	defer cancel()
+	if err != nil {
+		http.Error(rw, "Internal server error", http.StatusInternalServerError)
+	}
 
 	records, err := h.Service.Storage.GetAllUsersURLs(ctx, userID)
 	if err != nil {
@@ -294,11 +256,13 @@ func (h *MyHandler) GetAllUserURLs(rw http.ResponseWriter, req *http.Request) {
 		rw.WriteHeader(http.StatusNoContent)
 	}
 
-	enc := json.NewEncoder(rw)
-	if err := enc.Encode(records); err != nil {
+	data, err := json.Marshal(records)
+	if err != nil {
 		http.Error(rw, "Error: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
+	rw.Header().Set("Content-Type", "application/json")
+	rw.Write(data)
 }
 
 func (h *MyHandler) DeleteURLs(rw http.ResponseWriter, req *http.Request) {
@@ -308,12 +272,19 @@ func (h *MyHandler) DeleteURLs(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	var tokens []string
-	if err := json.NewDecoder(req.Body).Decode(&tokens); err != nil {
-		http.Error(rw, "Invalid JSON", http.StatusBadRequest)
+	body, err := io.ReadAll(req.Body)
+	if err != nil {
+		http.Error(rw, "Error: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 	defer req.Body.Close()
+
+	var tokens []string
+	err = json.Unmarshal(body, &tokens)
+	if err != nil {
+		http.Error(rw, "Invalid JSON", http.StatusBadRequest)
+		return
+	}
 
 	// Валидация токенов
 	if len(tokens) == 0 {

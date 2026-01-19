@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/google/uuid"
@@ -80,10 +81,10 @@ func ungzipMiddleware(next http.Handler) http.Handler {
 
 func (h *MyHandler) LoggingMiddleware(handler http.Handler) http.Handler {
 	logFn := func(w http.ResponseWriter, r *http.Request) {
-		// startTime := time.Now()
+		startTime := time.Now()
 
-		// uri := r.RequestURI
-		// metnod := r.Method
+		uri := r.RequestURI
+		metnod := r.Method
 
 		lw := responseWriter{
 			ResponseWriter: w,
@@ -92,15 +93,15 @@ func (h *MyHandler) LoggingMiddleware(handler http.Handler) http.Handler {
 
 		handler.ServeHTTP(&lw, r)
 
-		// duration := time.Since(startTime)
+		duration := time.Since(startTime)
 
-		// h.Logger.Infow("Request/Response data: ",
-		// 	"uri", uri,
-		// 	"method", metnod,
-		// 	"status", lw.responseData.status,
-		// 	"duration", int(duration),
-		// 	"size", lw.responseData.size,
-		// )
+		h.Service.Logger.Infow("Request/Response data: ",
+			"uri", uri,
+			"method", metnod,
+			"status", lw.responseData.status,
+			"duration", int(duration),
+			"size", lw.responseData.size,
+		)
 	}
 
 	return http.HandlerFunc(logFn)

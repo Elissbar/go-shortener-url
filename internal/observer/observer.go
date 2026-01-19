@@ -1,8 +1,6 @@
 package observer
 
 import (
-	"fmt"
-
 	"github.com/Elissbar/go-shortener-url/internal/model"
 )
 
@@ -46,7 +44,6 @@ func (e *Event) Notify() {
 }
 
 func (e *Event) Update(message model.AuditRequest) {
-	fmt.Println("Message: ", message)
 	e.Message = message
 	e.Notify()
 }
