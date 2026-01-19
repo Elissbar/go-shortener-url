@@ -108,13 +108,17 @@ func (h *MyHandler) CreateShortBatch(rw http.ResponseWriter, req *http.Request) 
 
 		body, err := io.ReadAll(req.Body)
 		if err != nil {
-			http.Error(rw, "Error 2: "+err.Error(), http.StatusInternalServerError)
+			http.Error(rw, "Error: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
 		defer req.Body.Close()
 
 		var reqBatch []model.ReqBatch
 		err = json.Unmarshal(body, &reqBatch)
+		if err != nil {
+			http.Error(rw, "Error: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
 
 		baseURL := getFullBaseURL(h.Service.Config.BaseURL)
 

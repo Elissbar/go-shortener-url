@@ -10,6 +10,8 @@ import (
 	"github.com/Elissbar/go-shortener-url/internal/service"
 )
 
+var sink interface{}
+
 func BenchmarkBatch(b *testing.B) {
 	size := 100
 	srvc := service.Service{
@@ -33,6 +35,7 @@ func BenchmarkBatch(b *testing.B) {
 				batch.Token = "123"
 				respBatch = append(respBatch, model.RespBatch{ID: batch.ID, ShortURL: shortedURL})
 			}
+			sink = respBatch
 		}
 	})
 
@@ -45,6 +48,7 @@ func BenchmarkBatch(b *testing.B) {
 				batch.Token = "123"
 				respBatch = append(respBatch, model.RespBatch{ID: batch.ID, ShortURL: shortedURL})
 			}
+			sink = respBatch
 		}
 	})
 }
