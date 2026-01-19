@@ -7,12 +7,13 @@ import (
 	"reflect"
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/Elissbar/go-shortener-url/internal/config"
 	"github.com/Elissbar/go-shortener-url/internal/logger"
 	"github.com/Elissbar/go-shortener-url/internal/observer"
 	"github.com/Elissbar/go-shortener-url/internal/repository"
 	"github.com/Elissbar/go-shortener-url/internal/repository/patterns"
-	"go.uber.org/zap"
 )
 
 type Service struct {
@@ -50,19 +51,19 @@ func NewService() *Service {
 	event := observer.NewEvent()
 	if cfg.AuditFile != "" {
 		event.Subscribe(&observer.FileSubscriber{ID: "FileSub", FilePath: cfg.AuditFile})
-		log.Infow("Registered file audit. Audit file: "+cfg.AuditFile)
+		log.Infow("Registered file audit. Audit file: " + cfg.AuditFile)
 	}
 	if cfg.AuditURL != "" {
 		event.Subscribe(&observer.HTTPSubscriber{ID: "HTTPSub", URL: cfg.AuditURL})
-		log.Infow("Registered http auditt. URL for audit: "+cfg.AuditURL)
+		log.Infow("Registered http auditt. URL for audit: " + cfg.AuditURL)
 	}
-	
+
 	return &Service{
 		Config:   cfg,
 		Logger:   log,
 		Storage:  storage,
 		Event:    event,
-		Helper:  &Helper{storage: &storage},
+		Helper:   &Helper{storage: &storage},
 		DeleteCh: make(chan DeleteRequest, 1000),
 	}
 }

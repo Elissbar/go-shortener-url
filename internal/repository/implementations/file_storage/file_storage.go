@@ -108,5 +108,6 @@ func (fs *FileStorage) GetAllUsersURLs(ctx context.Context, userID string) ([]mo
 	return []model.URLRecord{}, nil
 }
 
-func (fs *FileStorage) DeleteByTokens(ctx context.Context, userID string, tokens []string) error {return nil}
-
+func (fs *FileStorage) DeleteByTokens(ctx context.Context, userID string, tokens []string) error {
+	return nil
+}

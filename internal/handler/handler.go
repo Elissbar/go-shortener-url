@@ -7,10 +7,11 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/go-chi/chi/v5"
+
 	"github.com/Elissbar/go-shortener-url/internal/model"
 	"github.com/Elissbar/go-shortener-url/internal/repository"
 	"github.com/Elissbar/go-shortener-url/internal/service"
-	"github.com/go-chi/chi/v5"
 )
 
 type MyHandler struct {

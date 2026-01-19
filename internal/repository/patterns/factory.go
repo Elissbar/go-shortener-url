@@ -1,11 +1,12 @@
 package patterns
 
 import (
+	"go.uber.org/zap"
+
 	"github.com/Elissbar/go-shortener-url/internal/repository"
 	databasestorage "github.com/Elissbar/go-shortener-url/internal/repository/implementations/database_storage"
 	filestorage "github.com/Elissbar/go-shortener-url/internal/repository/implementations/file_storage"
 	memorystorage "github.com/Elissbar/go-shortener-url/internal/repository/implementations/memory_storage"
-	"go.uber.org/zap"
 )
 
 func NewStorage(log *zap.SugaredLogger, databaseAdr, fileStoragePath string) (repository.Storage, error) {

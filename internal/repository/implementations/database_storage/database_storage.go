@@ -4,17 +4,16 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-
 	"fmt"
 
-	"github.com/Elissbar/go-shortener-url/internal/model"
-	"github.com/Elissbar/go-shortener-url/internal/repository"
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database/postgres"
 	"github.com/jackc/pgerrcode"
+	"github.com/lib/pq"
 	"go.uber.org/zap"
 
-	"github.com/lib/pq"
+	"github.com/Elissbar/go-shortener-url/internal/model"
+	"github.com/Elissbar/go-shortener-url/internal/repository"
 
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 )
@@ -176,4 +175,3 @@ func (db *DBStorage) DeleteByTokens(ctx context.Context, userID string, tokens [
 		"userID", userID)
 	return nil
 }
-

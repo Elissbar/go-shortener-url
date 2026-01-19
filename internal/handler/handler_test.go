@@ -10,13 +10,14 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/Elissbar/go-shortener-url/internal/config"
 	"github.com/Elissbar/go-shortener-url/internal/logger"
 	"github.com/Elissbar/go-shortener-url/internal/model"
 	"github.com/Elissbar/go-shortener-url/internal/observer"
 	memorystorage "github.com/Elissbar/go-shortener-url/internal/repository/implementations/memory_storage"
 	"github.com/Elissbar/go-shortener-url/internal/service"
-	"github.com/stretchr/testify/require"
 )
 
 var myHandler MyHandler

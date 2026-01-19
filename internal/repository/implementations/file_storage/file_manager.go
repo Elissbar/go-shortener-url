@@ -37,12 +37,11 @@ func (fm *FileManager) EnsureFile() error {
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return err
 	}
-	
+
 	// Если файла нет - создаем пустой
 	if _, err := os.Stat(fm.FilePath); os.IsNotExist(err) {
 		return os.WriteFile(fm.FilePath, []byte("[]"), 0644)
 	}
-	
+
 	return nil
 }
-

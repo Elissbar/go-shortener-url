@@ -5,8 +5,8 @@ import (
 )
 
 type Cache struct {
-	mu          sync.RWMutex
-	data        map[string]string
+	mu   sync.RWMutex
+	data map[string]string
 }
 
 func (ch *Cache) SaveToMemory(token, url string) {

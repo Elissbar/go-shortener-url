@@ -15,8 +15,8 @@ func main() {
 
 	// для запуска pprof на отдельном порту
 	// go func() {
-    //     http.ListenAndServe("localhost:6060", nil)
-    // }()
+	//     http.ListenAndServe("localhost:6060", nil)
+	// }()
 
 	myHandler := handler.NewHandler(srvc)
 	err := http.ListenAndServe(srvc.Config.ServerURL, myHandler.Router())
