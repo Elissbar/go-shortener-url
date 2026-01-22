@@ -66,6 +66,8 @@ func (h *MyHandler) GetRoot(rw http.ResponseWriter, req *http.Request) {
 //	{"url": "https://practicum.yandex.ru/learn/go-advanced/"}
 func (h *MyHandler) CreateShortURLJSON(rw http.ResponseWriter, req *http.Request) {
 	if req.Method == http.MethodPost {
+		rw.Header().Set("Content-Type", "application/json")
+
 		userID, ctx, cancel, err := prepareHandler(req)
 		defer cancel()
 		if err != nil {
@@ -106,7 +108,6 @@ func (h *MyHandler) CreateShortURLJSON(rw http.ResponseWriter, req *http.Request
 
 		audit(h.Service.Event, "shorten", userID, rq.URL)
 
-		rw.Header().Set("Content-Type", "application/json")
 		rw.Write(data)
 	}
 }
