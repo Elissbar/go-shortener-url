@@ -14,6 +14,7 @@ import (
 	"github.com/Elissbar/go-shortener-url/internal/service"
 )
 
+// MyHandler тип через который регистрируются обработчики.
 type MyHandler struct {
 	Service *service.Service
 }
@@ -24,6 +25,7 @@ func NewHandler(srvc *service.Service) *MyHandler {
 	}
 }
 
+// Router метод для регистрации обработчиков.
 func (h *MyHandler) Router() chi.Router {
 	r := chi.NewRouter()
 
@@ -50,10 +52,20 @@ func (h *MyHandler) GetRoot(rw http.ResponseWriter, req *http.Request) {
 	}
 }
 
+// @Summary Запрос для сокращения ссылки.
+// @ID CreateShortURLJSON
+// @Product json
+// @Param request body model.Request true "Request"
+// @Success 201 {object} model.Response
+// @Failure 409 {string} string "Conflict"
+// @Failure 500 {string} string "Internal server error"
+// @Router /api/shorten [post]
+// CreateShortURLJSON обработчик для создания короткой ссылки, принимает данные в формате JSON.
+// Пример запроса:
+//
+//	{"url": "https://practicum.yandex.ru/learn/go-advanced/"}
 func (h *MyHandler) CreateShortURLJSON(rw http.ResponseWriter, req *http.Request) {
 	if req.Method == http.MethodPost {
-		rw.Header().Set("Content-Type", "application/json")
-
 		userID, ctx, cancel, err := prepareHandler(req)
 		defer cancel()
 		if err != nil {
@@ -86,16 +98,26 @@ func (h *MyHandler) CreateShortURLJSON(rw http.ResponseWriter, req *http.Request
 		var resp model.Response
 		resp.Result = baseURL + savedToken
 
-		enc := json.NewEncoder(rw)
-		if err := enc.Encode(resp); err != nil {
+		data, err := json.Marshal(resp)
+		if err != nil {
 			http.Error(rw, "Error: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
 
 		audit(h.Service.Event, "shorten", userID, rq.URL)
+
+		rw.Header().Set("Content-Type", "application/json")
+		rw.Write(data)
 	}
 }
 
+// CreateShortBatch метод для обработки ссылок батчами.
+// Пример запроса:
+//
+//	 [
+//	   {"correlation_id": "123", "original_url": "https://practicum.yandex.ru/learn/go-advanced/courses/"},
+//	   {"correlation_id": "456", "original_url": "https://practicum.yandex.ru2/learn2/go-advanced2/courses2/"},
+//		]
 func (h *MyHandler) CreateShortBatch(rw http.ResponseWriter, req *http.Request) {
 	if req.Method == http.MethodPost {
 		rw.Header().Set("Content-Type", "application/json")
@@ -155,6 +177,7 @@ func (h *MyHandler) CreateShortBatch(rw http.ResponseWriter, req *http.Request) 
 	}
 }
 
+// CreateShortURL принимает данные в формате text/plain и сокращает URL.
 func (h *MyHandler) CreateShortURL(rw http.ResponseWriter, req *http.Request) {
 	if req.Method == http.MethodPost {
 		rw.Header().Set("content-type", "text/plain")
@@ -196,6 +219,7 @@ func (h *MyHandler) CreateShortURL(rw http.ResponseWriter, req *http.Request) {
 	}
 }
 
+// GetShortURL возвращает сокращённый URL.
 func (h *MyHandler) GetShortURL(rw http.ResponseWriter, req *http.Request) {
 	if req.Method != http.MethodGet {
 		return
@@ -233,6 +257,7 @@ func (h *MyHandler) GetShortURL(rw http.ResponseWriter, req *http.Request) {
 	http.Redirect(rw, req, url, http.StatusTemporaryRedirect)
 }
 
+// CheckConnectionDB проверяет соединение с базой данных.
 func (h *MyHandler) CheckConnectionDB(rw http.ResponseWriter, req *http.Request) {
 	if err := h.Service.Helper.Ping(); err != nil {
 		rw.WriteHeader(http.StatusInternalServerError)
@@ -244,6 +269,7 @@ func (h *MyHandler) CheckConnectionDB(rw http.ResponseWriter, req *http.Request)
 	rw.Write([]byte("Database connection is success"))
 }
 
+// GetAllUserURLs возвращает все сокращённые URL пользователя.
 func (h *MyHandler) GetAllUserURLs(rw http.ResponseWriter, req *http.Request) {
 	userID, ctx, cancel, err := prepareHandler(req)
 	defer cancel()
@@ -270,6 +296,7 @@ func (h *MyHandler) GetAllUserURLs(rw http.ResponseWriter, req *http.Request) {
 	rw.Write(data)
 }
 
+// DeleteURLs принимает список токенов и удаляет их.
 func (h *MyHandler) DeleteURLs(rw http.ResponseWriter, req *http.Request) {
 	userID, ok := req.Context().Value(userIDKey).(string)
 	if !ok || userID == "" {

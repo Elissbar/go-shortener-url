@@ -9,6 +9,8 @@ import (
 	"github.com/Elissbar/go-shortener-url/internal/repository"
 )
 
+// FileStorage тип для хранения данных в файле.
+// Deprecated: используйте DBStorage.
 type FileStorage struct {
 	tokenURL    *sync.Map // token: url
 	urlToken    *sync.Map // url: token

@@ -16,6 +16,7 @@ import (
 	"github.com/Elissbar/go-shortener-url/internal/repository/patterns"
 )
 
+// Service тип реализует слой сервиса, предоставляет функции для реализации бизнес-логики и другие вспомогательные функции.
 type Service struct {
 	Config   *config.Config
 	Logger   *zap.SugaredLogger
@@ -102,7 +103,6 @@ func (s *Service) GenerateToken(size int) (string, error) {
 	return token, nil
 }
 
-// Более простая реализация
 func (s *Service) ProcessDeletions() {
 	s.Logger.Info("Deletion processor started")
 	defer s.Logger.Info("Deletion processor stopped")

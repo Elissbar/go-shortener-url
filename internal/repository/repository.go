@@ -6,6 +6,7 @@ import (
 	"github.com/Elissbar/go-shortener-url/internal/model"
 )
 
+// Storage интерфейс для чтения и записи данных в хранилище.
 type Storage interface {
 	Reader
 	Writer

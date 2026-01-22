@@ -8,6 +8,10 @@ import (
 	// _ "net/http/pprof"
 )
 
+// @title Shortener URL API
+// @host localhost:8080
+// @schemes http
+// @BasePath /
 func main() {
 	srvc := service.NewService()
 	go srvc.ProcessDeletions()

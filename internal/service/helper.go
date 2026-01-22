@@ -5,6 +5,7 @@ import (
 	databasestorage "github.com/Elissbar/go-shortener-url/internal/repository/implementations/database_storage"
 )
 
+// Helper - вспомогательный тип для работы с хранилищем.
 type Helper struct {
 	storage *repository.Storage
 }
