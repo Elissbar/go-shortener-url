@@ -83,8 +83,8 @@ func (db *DBStorage) Save(ctx context.Context, token, url, userID, baseURL strin
 			if err != nil {
 				return "", err
 			}
-			// return oldToken, repository.ErrURLExists
-			return token, nil // TODO: убрать
+			return oldToken, repository.ErrURLExists
+			// return token, nil // TODO: убрать
 		}
 		return "", err
 	}
