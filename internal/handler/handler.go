@@ -115,10 +115,10 @@ func (h *MyHandler) CreateShortURLJSON(rw http.ResponseWriter, req *http.Request
 // CreateShortBatch метод для обработки ссылок батчами.
 // Пример запроса:
 //
-//	 [
-//	   {"correlation_id": "123", "original_url": "https://practicum.yandex.ru/learn/go-advanced/courses/"},
-//	   {"correlation_id": "456", "original_url": "https://practicum.yandex.ru2/learn2/go-advanced2/courses2/"},
-//   ]
+//		 [
+//		   {"correlation_id": "123", "original_url": "https://practicum.yandex.ru/learn/go-advanced/courses/"},
+//		   {"correlation_id": "456", "original_url": "https://practicum.yandex.ru2/learn2/go-advanced2/courses2/"},
+//	  ]
 func (h *MyHandler) CreateShortBatch(rw http.ResponseWriter, req *http.Request) {
 	if req.Method == http.MethodPost {
 		rw.Header().Set("Content-Type", "application/json")
