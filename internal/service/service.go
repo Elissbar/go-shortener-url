@@ -64,7 +64,7 @@ func NewService() *Service {
 		Logger:   log,
 		Storage:  storage,
 		Event:    event,
-		Helper:   &Helper{storage: &storage},
+		Helper:   &Helper{Storage: &storage},
 		DeleteCh: make(chan DeleteRequest, 1000),
 	}
 }
@@ -92,6 +92,9 @@ func (s *Service) GetToken(ctx context.Context) (string, error) {
 
 func (s *Service) GenerateToken(size int) (string, error) {
 	// Генерируем токен - id короткой ссылки
+	if size <= 0 {
+		return "", nil
+	}
 	b := make([]byte, size)
 	_, err := rand.Read(b)
 	if err != nil {

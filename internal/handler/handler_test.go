@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -9,6 +10,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -143,7 +145,7 @@ func TestGetShortUrl(t *testing.T) {
 	}
 }
 
-func TestCreateShortUrlJSON(t *testing.T) {
+func TestCreateShortURLJSON(t *testing.T) {
 	type want struct {
 		contentType string
 		statusCode  int
@@ -197,5 +199,88 @@ func TestCreateShortUrlJSON(t *testing.T) {
 		require.Equal(t, tt.want.statusCode, result.StatusCode)
 		require.Equal(t, tt.want.contentType, result.Header.Get("Content-Type"))
 		require.NotEmpty(t, resp.Result, "Result should not be empty")
+	}
+}
+
+func TestCreateShortBatch(t *testing.T) {
+	type want struct {
+		statusCode  int
+		contentType string
+	}
+
+	tests := []struct {
+		name string
+		data []map[string]string
+		want want
+	}{
+		{
+			name: "Create short batch",
+			data: []map[string]string{
+				{
+					"correlation_id": "1",
+					"original_url":   "https://practicum.yandex.ru/somecourse1",
+				},
+				{
+					"correlation_id": "2",
+					"original_url":   "https://practicum.yandex.ru/somecourse2",
+				},
+				{
+					"correlation_id": "3",
+					"original_url":   "https://practicum.yandex.ru/somecourse3",
+				},
+			},
+			want: want{
+				statusCode:  201,
+				contentType: "application/json",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			byteData, err := json.Marshal(tt.data)
+			if err != nil {
+				t.Fatalf("Error marshaling data: %v", err)
+			}
+
+			request := httptest.NewRequest(http.MethodPost, "/api/shorten/batch", strings.NewReader(string(byteData)))
+			w := httptest.NewRecorder()
+
+			router := myHandler.Router()
+			router.ServeHTTP(w, request)
+
+			result := w.Result()
+			defer result.Body.Close()
+
+			body, err := io.ReadAll(result.Body)
+			if err != nil {
+				t.Fatalf("Error read body")
+			}
+
+			var resp []model.RespBatch
+			err = json.Unmarshal(body, &resp)
+			if err != nil {
+				t.Fatalf("Error unmarshal body")
+			}
+
+			require.Equal(t, tt.want.statusCode, result.StatusCode)
+			require.Equal(t, tt.want.contentType, result.Header.Get("Content-Type"))
+			require.NotEmpty(t, resp, "Result should not be empty")
+
+			for ind, r := range resp {
+				url := strings.Split(r.ShortURL, "/")
+				token := url[len(url)-1]
+
+				ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
+				defer cancel()
+
+				fullURL, err := myHandler.Service.Storage.Get(ctx, token)
+				if err != nil {
+					t.Fatalf("Error test. URL not saved")
+				}
+
+				require.Equal(t, tt.data[ind]["original_url"], fullURL)
+			}
+		})
 	}
 }

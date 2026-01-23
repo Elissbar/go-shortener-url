@@ -7,11 +7,11 @@ import (
 
 // Helper - вспомогательный тип для работы с хранилищем.
 type Helper struct {
-	storage *repository.Storage
+	Storage *repository.Storage
 }
 
 func (h *Helper) Ping() error {
-	db, ok := (*h.storage).(*databasestorage.DBStorage)
+	db, ok := (*h.Storage).(*databasestorage.DBStorage)
 	if ok {
 		return db.DB.Ping()
 	}
@@ -19,7 +19,7 @@ func (h *Helper) Ping() error {
 }
 
 func (h *Helper) Close() error {
-	db, ok := (*h.storage).(*databasestorage.DBStorage)
+	db, ok := (*h.Storage).(*databasestorage.DBStorage)
 	if ok {
 		return db.DB.Close()
 	}
