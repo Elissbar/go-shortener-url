@@ -161,13 +161,13 @@ func (h *MyHandler) CreateShortBatch(rw http.ResponseWriter, req *http.Request) 
 			respBatch = append(respBatch, model.RespBatch{ID: batch.ID, ShortURL: shortedURL})
 		}
 
-		data, err := json.Marshal(respBatch) // 29 sec
+		err = h.Service.Storage.SaveBatch(ctx, reqBatch, userID, baseURL)
 		if err != nil {
 			http.Error(rw, "Error: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
 
-		err = h.Service.Storage.SaveBatch(ctx, reqBatch, userID, baseURL)
+		data, err := json.Marshal(respBatch) // 29 sec
 		if err != nil {
 			http.Error(rw, "Error: "+err.Error(), http.StatusInternalServerError)
 			return

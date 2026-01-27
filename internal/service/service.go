@@ -4,16 +4,12 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/base64"
-	"reflect"
 	"time"
 
-	"go.uber.org/zap"
-
 	"github.com/Elissbar/go-shortener-url/internal/config"
-	"github.com/Elissbar/go-shortener-url/internal/logger"
 	"github.com/Elissbar/go-shortener-url/internal/observer"
 	"github.com/Elissbar/go-shortener-url/internal/repository"
-	"github.com/Elissbar/go-shortener-url/internal/repository/patterns"
+	"go.uber.org/zap"
 )
 
 // Service тип реализует слой сервиса, предоставляет функции для реализации бизнес-логики и другие вспомогательные функции.
@@ -31,34 +27,7 @@ type DeleteRequest struct {
 	Tokens []string
 }
 
-func NewService() *Service {
-	cfg, err := config.NewConfig()
-	if err != nil {
-		panic(err)
-	}
-
-	log, err := logger.NewSugaredLogger(cfg.LogLevel)
-	if err != nil {
-		panic(err)
-	}
-	defer log.Sync()
-
-	storage, err := patterns.NewStorage(log, cfg.DatabaseAdr, cfg.FileStoragePath)
-	if err != nil {
-		panic(err)
-	}
-	log.Infow("Storage type:", "type", reflect.TypeOf(storage))
-
-	event := observer.NewEvent()
-	if cfg.AuditFile != "" {
-		event.Subscribe(&observer.FileSubscriber{ID: "FileSub", FilePath: cfg.AuditFile})
-		log.Infow("Registered file audit. Audit file: " + cfg.AuditFile)
-	}
-	if cfg.AuditURL != "" {
-		event.Subscribe(&observer.HTTPSubscriber{ID: "HTTPSub", URL: cfg.AuditURL})
-		log.Infow("Registered http auditt. URL for audit: " + cfg.AuditURL)
-	}
-
+func NewService(cfg *config.Config, log *zap.SugaredLogger, storage repository.Storage, event *observer.Event) *Service {
 	return &Service{
 		Config:   cfg,
 		Logger:   log,

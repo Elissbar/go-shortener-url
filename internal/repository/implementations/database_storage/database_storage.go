@@ -102,12 +102,11 @@ func (db *DBStorage) SaveBatch(ctx context.Context, batch []model.ReqBatch, user
 		_, err := tx.ExecContext(ctx, "INSERT INTO shorted_links (token, url, user_id, shorted_url) VALUES ($1, $2, $3, $4)", b.Token, b.OriginalURL, userID, baseURL+b.Token)
 		if err != nil {
 			tx.Rollback()
-			return err
+			return fmt.Errorf("error while saving batch: %w", err)
 		}
 	}
 
-	tx.Commit()
-	return nil
+	return tx.Commit()
 }
 
 // Get возвращает ранее сокращенный URL по переданному токену.
