@@ -1,32 +1,41 @@
 package handler
 
 import (
-	"crypto/rand"
-	"encoding/base64"
+	"context"
+	"fmt"
+	"net/http"
+	"strings"
+	"time"
 
-	"github.com/Elissbar/go-shortener-url/internal/repository"
+	"github.com/Elissbar/go-shortener-url/internal/model"
+	"github.com/Elissbar/go-shortener-url/internal/observer"
 )
 
-func getToken(storage repository.Storage) (string, error) {
-	token, err := generateToken()
-	if err != nil {
-		return "", err
-	}
-	for _, ok := storage.Get(token); ok; { // Если такой токен уже есть - генерируем новый
-		token, _ = generateToken()
-	}
-	return token, nil
+func audit(event *observer.Event, action, userID, url string) {
+	event.Update(model.AuditRequest{
+		TS:     time.Now().Unix(),
+		Action: action,
+		UserID: userID,
+		URL:    url,
+	})
 }
 
-func generateToken() (string, error) {
-	// Генерируем токен - id короткой ссылки
-	b := make([]byte, 8)
-	_, err := rand.Read(b)
-	if err != nil {
-		return "", err
+func getFullBaseURL(baseURL string) string {
+	fullURL := baseURL
+	if !strings.HasSuffix(baseURL, "/") {
+		fullURL = baseURL + "/"
+	}
+	return fullURL
+}
+
+func prepareHandler(r *http.Request) (string, context.Context, context.CancelFunc, error) {
+	ctx, cancel := context.WithTimeout(r.Context(), time.Second*3)
+
+	userID, ok := r.Context().Value(userIDKey).(string)
+	if !ok {
+		cancel()
+		return "", nil, nil, fmt.Errorf("error get user id")
 	}
 
-	token := base64.URLEncoding.EncodeToString(b)
-	token = token[:len(token)-1]
-	return token, nil
+	return userID, ctx, cancel, nil
 }
