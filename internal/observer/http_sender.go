@@ -19,14 +19,12 @@ func (h *HTTPSubscriber) Update(message model.AuditRequest) error {
 	if err != nil {
 		return fmt.Errorf("error marshal data: %w", err)
 	}
-	fmt.Println("Data parsed")
 
 	client := http.Client{}
 	req, err := http.NewRequest("POST", h.URL, bytes.NewBuffer(data))
 	if err != nil {
 		return fmt.Errorf("error create new request: %w", err)
 	}
-	fmt.Println("Client created")
 
 	resp, err := client.Do(req)
 	resp.Body.Close()

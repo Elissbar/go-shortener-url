@@ -128,7 +128,6 @@ func (h *MyHandler) authentication(next http.Handler) http.Handler {
 		} else {
 			userID, err = verifyAuthToken(cookie.Value, h.Service.Config.JWTSecret)
 			if err != nil {
-				fmt.Println("Ошибка при проверке валидации куки")
 				http.Error(w, "Invalid token", http.StatusUnauthorized)
 				return
 			}

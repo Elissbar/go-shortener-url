@@ -72,6 +72,7 @@ func (h *MyHandler) CreateShortURLJSON(rw http.ResponseWriter, req *http.Request
 		defer cancel()
 		if err != nil {
 			http.Error(rw, "Internal server error", http.StatusInternalServerError)
+			return
 		}
 
 		token, err := h.Service.GetToken(ctx)
@@ -187,6 +188,7 @@ func (h *MyHandler) CreateShortURL(rw http.ResponseWriter, req *http.Request) {
 		defer cancel()
 		if err != nil {
 			http.Error(rw, "Internal server error", http.StatusInternalServerError)
+			return
 		}
 
 		token, err := h.Service.GetToken(ctx)
@@ -230,6 +232,7 @@ func (h *MyHandler) GetShortURL(rw http.ResponseWriter, req *http.Request) {
 	defer cancel()
 	if err != nil {
 		http.Error(rw, "Internal server error", http.StatusInternalServerError)
+		return
 	}
 
 	id := chi.URLParam(req, "id")
@@ -276,6 +279,7 @@ func (h *MyHandler) GetAllUserURLs(rw http.ResponseWriter, req *http.Request) {
 	defer cancel()
 	if err != nil {
 		http.Error(rw, "Internal server error", http.StatusInternalServerError)
+		return
 	}
 
 	records, err := h.Service.Storage.GetAllUsersURLs(ctx, userID)

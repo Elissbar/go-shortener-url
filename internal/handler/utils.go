@@ -33,7 +33,8 @@ func prepareHandler(r *http.Request) (string, context.Context, context.CancelFun
 
 	userID, ok := r.Context().Value(userIDKey).(string)
 	if !ok {
-		return "", ctx, cancel, fmt.Errorf("error get user id")
+		cancel()
+		return "", nil, nil, fmt.Errorf("error get user id")
 	}
 
 	return userID, ctx, cancel, nil
