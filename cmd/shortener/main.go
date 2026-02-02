@@ -2,14 +2,31 @@ package main
 
 import (
 	"net/http"
+	// "os"
+	"reflect"
 
+	"github.com/Elissbar/go-shortener-url/internal/config"
 	"github.com/Elissbar/go-shortener-url/internal/handler"
 	"github.com/Elissbar/go-shortener-url/internal/logger"
+	"github.com/Elissbar/go-shortener-url/internal/observer"
 	"github.com/Elissbar/go-shortener-url/internal/repository/patterns"
+	"github.com/Elissbar/go-shortener-url/internal/service"
+	// _ "net/http/pprof"
 )
 
+// @title Shortener URL API
+// @host localhost:8080
+// @schemes http
+// @BasePath /
 func main() {
-	cfg, err := parseFlags()
+	// для запуска pprof на отдельном порту
+	// go func() {
+	//     http.ListenAndServe("localhost:6060", nil)
+	// }()
+
+	// os.Exit(1)
+
+	cfg, err := config.NewConfig()
 	if err != nil {
 		panic(err)
 	}
@@ -20,21 +37,28 @@ func main() {
 	}
 	defer log.Sync()
 
-	storage, err := patterns.NewStorage(cfg)
+	storage, err := patterns.NewStorage(log, cfg.DatabaseAdr, cfg.FileStoragePath)
 	if err != nil {
 		panic(err)
 	}
-	defer storage.Close()
+	log.Infow("Storage type:", "type", reflect.TypeOf(storage))
 
-	myHandler := &handler.MyHandler{
-		Storage: storage,
-		Config:  cfg,
-		Logger:  log,
+	event := observer.NewEvent()
+	if cfg.AuditFile != "" {
+		event.Subscribe(&observer.FileSubscriber{ID: "FileSub", FilePath: cfg.AuditFile})
+		log.Infow("Registered file audit. Audit file: " + cfg.AuditFile)
+	}
+	if cfg.AuditURL != "" {
+		event.Subscribe(&observer.HTTPSubscriber{ID: "HTTPSub", URL: cfg.AuditURL})
+		log.Infow("Registered http auditt. URL for audit: " + cfg.AuditURL)
 	}
 
-	router := myHandler.Router()
+	srvc := service.NewService(cfg, log, storage, event)
+	defer srvc.Helper.Close()
+	go srvc.ProcessDeletions()
 
-	err = http.ListenAndServe(cfg.ServerURL, router)
+	myHandler := handler.NewHandler(srvc)
+	err = http.ListenAndServe(srvc.Config.ServerURL, myHandler.Router())
 	if err != nil {
 		panic(err)
 	}

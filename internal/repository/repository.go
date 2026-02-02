@@ -1,7 +1,24 @@
 package repository
 
+import (
+	"context"
+
+	"github.com/Elissbar/go-shortener-url/internal/model"
+)
+
+// Storage интерфейс для чтения и записи данных в хранилище.
 type Storage interface {
-	Save(token, url string) error
-	Get(token string) (string, bool)
-	Close() error
+	Reader
+	Writer
+}
+
+type Reader interface {
+	Get(ctx context.Context, token string) (string, error)
+	GetAllUsersURLs(ctx context.Context, userID string) ([]model.URLRecord, error)
+}
+
+type Writer interface {
+	Save(ctx context.Context, token, url, userID, baseURL string) (string, error)
+	SaveBatch(ctx context.Context, batch []model.ReqBatch, userID, baseURL string) error
+	DeleteByTokens(ctx context.Context, userID string, tokens []string) error
 }

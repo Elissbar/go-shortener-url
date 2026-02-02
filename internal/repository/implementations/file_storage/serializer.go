@@ -11,7 +11,7 @@ type Serializer interface {
 	Unmarshal([]byte) ([]model.URLRecord, error)
 }
 
-type JSONSerializer struct {}
+type JSONSerializer struct{}
 
 func (js *JSONSerializer) Marshal(records []model.URLRecord) ([]byte, error) {
 	marshaledData, err := json.MarshalIndent(records, "", "  ")
