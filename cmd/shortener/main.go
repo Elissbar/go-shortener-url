@@ -2,6 +2,7 @@ package main
 
 import (
 	"net/http"
+	// "os"
 	"reflect"
 
 	"github.com/Elissbar/go-shortener-url/internal/config"
@@ -22,6 +23,8 @@ func main() {
 	// go func() {
 	//     http.ListenAndServe("localhost:6060", nil)
 	// }()
+
+	// os.Exit(1)
 
 	cfg, err := config.NewConfig()
 	if err != nil {
