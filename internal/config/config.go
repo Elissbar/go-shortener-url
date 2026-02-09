@@ -8,6 +8,7 @@ import (
 	"github.com/caarlos0/env/v11"
 )
 
+// generate:reset
 type Config struct {
 	ServerURL       string `env:"SERVER_ADDRESS"`
 	BaseURL         string `env:"BASE_URL"`

@@ -4,9 +4,11 @@ import (
 	"sync"
 )
 
+// generate:reset
 type Cache struct {
 	mu   sync.RWMutex
 	data map[string]string
+	arr  []string
 }
 
 func (ch *Cache) SaveToMemory(token, url string) {
