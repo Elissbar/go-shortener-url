@@ -129,13 +129,13 @@ func main() {
 		var buf bytes.Buffer
 
 		data := map[string]any{
-			"Package": pkgName, 
+			"Package": pkgName,
 			"Structs": structs,
 		}
 
 		if err := t.Execute(&buf, data); err != nil {
 			fmt.Printf("Template error: %v\n", err)
-        	continue
+			continue
 		}
 
 		formatted, err := format.Source(buf.Bytes())
@@ -149,7 +149,7 @@ func main() {
 			fmt.Printf("Write error: %v\n", err)
 			continue
 		}
-		
+
 		fmt.Printf("Generated %s with %d struct(s)\n", outputPath, len(structs))
 	}
 }
