@@ -1,7 +1,9 @@
 package main
 
 import (
+	"fmt"
 	"net/http"
+
 	// "os"
 	"reflect"
 
@@ -12,6 +14,12 @@ import (
 	"github.com/Elissbar/go-shortener-url/internal/repository/patterns"
 	"github.com/Elissbar/go-shortener-url/internal/service"
 	// _ "net/http/pprof"
+)
+
+var (
+	buildVersion string = "N/A"
+	buildDate    string = "N/A"
+	buildCommit  string = "N/A"
 )
 
 // @title Shortener URL API
@@ -25,6 +33,10 @@ func main() {
 	// }()
 
 	// os.Exit(1)
+
+	fmt.Printf("Build version: %s\n", buildVersion)
+	fmt.Printf("Build date: %s\n", buildDate)
+	fmt.Printf("Build commit: %s\n", buildCommit)
 
 	cfg, err := config.NewConfig()
 	if err != nil {
