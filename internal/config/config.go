@@ -4,6 +4,7 @@ import (
 	"flag"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/caarlos0/env/v11"
 )
@@ -18,7 +19,13 @@ type Config struct {
 	JWTSecret       string `env:"JWT_SECRET"`
 	AuditFile       string `env:"AUDIT_FILE"`
 	AuditURL        string `env:"AUDIT_URL"`
-	EnableHTTPS     *bool   `env:"ENABLE_HTTPS"`
+	EnableHTTPS     *bool  `env:"ENABLE_HTTPS"`
+	// Timeouts
+	DeleteURLDelay     time.Duration
+	DeleteURLStopAfter time.Duration
+	HandlerCtxTimeout  time.Duration
+	TestsTimeout       time.Duration
+	WorkerTimeout      time.Duration
 }
 
 func NewConfig() (*Config, error) {
@@ -30,6 +37,7 @@ func NewConfig() (*Config, error) {
 
 	var serverURL, baseURL, logLevel, fileStoragePath, databaseAdr, auditFile, auditURL string
 	var enableHTTPS bool
+	var deleteDelay, deleteStopAfter, handlerTimeout, testsTimeout, workerTimeout int
 	flag.StringVar(&serverURL, "a", ":8080", ":<port>")
 	flag.StringVar(&baseURL, "b", "http://localhost:8080/", "Base URL for the API. Example: http://localhost:8080/")
 	flag.StringVar(&logLevel, "l", "info", "Log level. Example: info, debug, error")
@@ -38,10 +46,33 @@ func NewConfig() (*Config, error) {
 	flag.StringVar(&auditFile, "audit-file", "", "File path for audit")
 	flag.StringVar(&auditURL, "audit-url", "", "URL for audit")
 	flag.BoolVar(&enableHTTPS, "s", false, "Enable HTTPS")
+	// Timeouts
+	flag.IntVar(&deleteDelay, "dd", 100, "Deletion URL delay in milliseconds")
+	flag.IntVar(&deleteStopAfter, "sa", 500, "Stop deletion after N milliseconds")
+	flag.IntVar(&handlerTimeout, "ht", 3, "Timeout for handlers in seconds")
+	flag.IntVar(&testsTimeout, "tt", 3, "Timeout for tests in seconds")
+	flag.IntVar(&workerTimeout, "wt", 3, "Timeout for workers in seconds")
 
 	// flag.StringVar(&fileStoragePath, "f", "/tmp/links.json", "File storage path")
 	// flag.StringVar(&databaseAdr, "d", "postgres://postgres:12345@localhost:5432/shorted_links?sslmode=disable", "Database connection string")
 	flag.Parse()
+
+	// Timeouts
+	if cfg.DeleteURLDelay == 0 {
+		cfg.DeleteURLDelay = time.Duration(deleteDelay) * time.Millisecond
+	}
+	if cfg.DeleteURLStopAfter == 0 {
+		cfg.DeleteURLStopAfter = time.Duration(deleteStopAfter) * time.Millisecond
+	}
+	if cfg.HandlerCtxTimeout == 0 {
+		cfg.HandlerCtxTimeout = time.Duration(handlerTimeout) * time.Second
+	}
+	if cfg.TestsTimeout == 0 {
+		cfg.TestsTimeout = time.Duration(testsTimeout) * time.Second
+	}
+	if cfg.WorkerTimeout == 0 {
+		cfg.WorkerTimeout = time.Duration(workerTimeout) * time.Second
+	}
 
 	if cfg.ServerURL == "" {
 		cfg.ServerURL = serverURL
@@ -74,6 +105,9 @@ func NewConfig() (*Config, error) {
 	}
 	if cfg.EnableHTTPS == nil {
 		cfg.EnableHTTPS = &enableHTTPS
+	}
+	if cfg.JWTSecret == "" {
+		cfg.JWTSecret = "secret"
 	}
 
 	return &cfg, nil

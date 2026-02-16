@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/base64"
-	"time"
 
 	"github.com/Elissbar/go-shortener-url/internal/config"
 	"github.com/Elissbar/go-shortener-url/internal/observer"
@@ -93,7 +92,7 @@ func (s *Service) deletionWorker(workerID int) {
 		}
 
 		// Быстрое выполнение без буферизации
-		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), s.Config.WorkerTimeout)
 		err := s.Storage.DeleteByTokens(ctx, deleteReq.UserID, deleteReq.Tokens)
 		cancel()
 

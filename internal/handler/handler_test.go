@@ -10,7 +10,6 @@ import (
 	"strings"
 	"sync"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -271,7 +270,7 @@ func TestCreateShortBatch(t *testing.T) {
 				url := strings.Split(r.ShortURL, "/")
 				token := url[len(url)-1]
 
-				ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
+				ctx, cancel := context.WithTimeout(context.Background(), myHandler.Service.Config.TestsTimeout)
 				defer cancel()
 
 				fullURL, err := myHandler.Service.Storage.Get(ctx, token)

@@ -68,7 +68,7 @@ func (h *MyHandler) CreateShortURLJSON(rw http.ResponseWriter, req *http.Request
 	if req.Method == http.MethodPost {
 		rw.Header().Set("Content-Type", "application/json")
 
-		userID, ctx, cancel, err := prepareHandler(req)
+		userID, ctx, cancel, err := prepareHandler(req, h.Service.Config.HandlerCtxTimeout)
 		defer cancel()
 		if err != nil {
 			http.Error(rw, "Internal server error", http.StatusInternalServerError)
@@ -124,7 +124,7 @@ func (h *MyHandler) CreateShortBatch(rw http.ResponseWriter, req *http.Request) 
 	if req.Method == http.MethodPost {
 		rw.Header().Set("Content-Type", "application/json")
 
-		userID, ctx, cancel, err := prepareHandler(req)
+		userID, ctx, cancel, err := prepareHandler(req, h.Service.Config.HandlerCtxTimeout)
 		defer cancel()
 		if err != nil {
 			http.Error(rw, "Internal server error", http.StatusInternalServerError)
@@ -184,7 +184,7 @@ func (h *MyHandler) CreateShortURL(rw http.ResponseWriter, req *http.Request) {
 	if req.Method == http.MethodPost {
 		rw.Header().Set("content-type", "text/plain")
 
-		userID, ctx, cancel, err := prepareHandler(req)
+		userID, ctx, cancel, err := prepareHandler(req, h.Service.Config.HandlerCtxTimeout)
 		defer cancel()
 		if err != nil {
 			http.Error(rw, "Internal server error", http.StatusInternalServerError)
@@ -228,7 +228,7 @@ func (h *MyHandler) GetShortURL(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	userID, ctx, cancel, err := prepareHandler(req)
+	userID, ctx, cancel, err := prepareHandler(req, h.Service.Config.HandlerCtxTimeout)
 	defer cancel()
 	if err != nil {
 		http.Error(rw, "Internal server error", http.StatusInternalServerError)
@@ -275,7 +275,7 @@ func (h *MyHandler) CheckConnectionDB(rw http.ResponseWriter, req *http.Request)
 
 // GetAllUserURLs возвращает все сокращённые URL пользователя.
 func (h *MyHandler) GetAllUserURLs(rw http.ResponseWriter, req *http.Request) {
-	userID, ctx, cancel, err := prepareHandler(req)
+	userID, ctx, cancel, err := prepareHandler(req, h.Service.Config.HandlerCtxTimeout)
 	defer cancel()
 	if err != nil {
 		http.Error(rw, "Internal server error", http.StatusInternalServerError)
@@ -335,7 +335,7 @@ func (h *MyHandler) DeleteURLs(rw http.ResponseWriter, req *http.Request) {
 		Tokens: tokens,
 	}
 
-	timeout := time.After(100 * time.Millisecond)
+	timeout := time.After(h.Service.Config.DeleteURLDelay)
 	select {
 	case h.Service.DeleteCh <- deleteReq:
 		rw.WriteHeader(http.StatusAccepted)
@@ -344,7 +344,7 @@ func (h *MyHandler) DeleteURLs(rw http.ResponseWriter, req *http.Request) {
 		select {
 		case h.Service.DeleteCh <- deleteReq:
 			rw.WriteHeader(http.StatusAccepted)
-		case <-time.After(500 * time.Millisecond):
+		case <-time.After(h.Service.Config.DeleteURLStopAfter):
 			http.Error(rw, "Service busy", http.StatusServiceUnavailable)
 		}
 	}

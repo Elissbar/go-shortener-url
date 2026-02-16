@@ -28,8 +28,8 @@ func getFullBaseURL(baseURL string) string {
 	return fullURL
 }
 
-func prepareHandler(r *http.Request) (string, context.Context, context.CancelFunc, error) {
-	ctx, cancel := context.WithTimeout(r.Context(), time.Second*3)
+func prepareHandler(r *http.Request, delay time.Duration) (string, context.Context, context.CancelFunc, error) {
+	ctx, cancel := context.WithTimeout(r.Context(), delay)
 
 	userID, ok := r.Context().Value(userIDKey).(string)
 	if !ok {
