@@ -37,8 +37,8 @@ func NewConfig() (*Config, error) {
 
 	var (
 		serverURL, baseURL, logLevel, fileStorage, dbURI, auditFile, auditURL string
-		deletionDelay, stopAfter, handlerTmt, testsTmt, workerTmt         int
-		https                                                             bool
+		deletionDelay, stopAfter, handlerTmt, testsTmt, workerTmt             int
+		https                                                                 bool
 	)
 
 	flag.StringVar(&serverURL, "a", ":8080", ":<port>")
@@ -64,7 +64,7 @@ func NewConfig() (*Config, error) {
 	applyIfEmpty(&cfg.LogLevel, logLevel)
 	applyIfEmpty(&cfg.DatabaseAdr, dbURI)
 	applyIfEmpty(&cfg.AuditURL, auditURL)
-	
+
 	applyPathIfEmpty(&cfg.FileStoragePath, fileStorage)
 	applyPathIfEmpty(&cfg.AuditFile, auditFile)
 
