@@ -18,6 +18,7 @@ type Config struct {
 	JWTSecret       string `env:"JWT_SECRET"`
 	AuditFile       string `env:"AUDIT_FILE"`
 	AuditURL        string `env:"AUDIT_URL"`
+	EnableHTTPS     *bool   `env:"ENABLE_HTTPS"`
 }
 
 func NewConfig() (*Config, error) {
@@ -28,6 +29,7 @@ func NewConfig() (*Config, error) {
 	}
 
 	var serverURL, baseURL, logLevel, fileStoragePath, databaseAdr, auditFile, auditURL string
+	var enableHTTPS bool
 	flag.StringVar(&serverURL, "a", ":8080", ":<port>")
 	flag.StringVar(&baseURL, "b", "http://localhost:8080/", "Base URL for the API. Example: http://localhost:8080/")
 	flag.StringVar(&logLevel, "l", "info", "Log level. Example: info, debug, error")
@@ -35,6 +37,7 @@ func NewConfig() (*Config, error) {
 	flag.StringVar(&databaseAdr, "d", "", "Database connection string")
 	flag.StringVar(&auditFile, "audit-file", "", "File path for audit")
 	flag.StringVar(&auditURL, "audit-url", "", "URL for audit")
+	flag.BoolVar(&enableHTTPS, "s", false, "Enable HTTPS")
 
 	// flag.StringVar(&fileStoragePath, "f", "/tmp/links.json", "File storage path")
 	// flag.StringVar(&databaseAdr, "d", "postgres://postgres:12345@localhost:5432/shorted_links?sslmode=disable", "Database connection string")
@@ -68,6 +71,9 @@ func NewConfig() (*Config, error) {
 	}
 	if cfg.AuditURL == "" {
 		cfg.AuditURL = auditURL
+	}
+	if cfg.EnableHTTPS == nil {
+		cfg.EnableHTTPS = &enableHTTPS
 	}
 
 	return &cfg, nil

@@ -70,7 +70,14 @@ func main() {
 	go srvc.ProcessDeletions()
 
 	myHandler := handler.NewHandler(srvc)
-	err = http.ListenAndServe(srvc.Config.ServerURL, myHandler.Router())
+
+	if cfg.EnableHTTPS != nil && (*cfg.EnableHTTPS) {
+		fmt.Println("🚀 HTTPS on :8080")
+		err = http.ListenAndServeTLS(srvc.Config.ServerURL, "cert.pem", "key.pem", myHandler.Router())
+	} else {
+		fmt.Println("🚀 HTTP on :8080")
+		err = http.ListenAndServe(srvc.Config.ServerURL, myHandler.Router())
+	}
 	if err != nil {
 		panic(err)
 	}
