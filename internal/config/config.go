@@ -35,80 +35,76 @@ func NewConfig() (*Config, error) {
 		return nil, err
 	}
 
-	var serverURL, baseURL, logLevel, fileStoragePath, databaseAdr, auditFile, auditURL string
-	var enableHTTPS bool
-	var deleteDelay, deleteStopAfter, handlerTimeout, testsTimeout, workerTimeout int
+	var (
+		serverURL, baseURL, logLevel, fileStorage, dbURI, auditFile, auditURL string
+		deletionDelay, stopAfter, handlerTmt, testsTmt, workerTmt         int
+		https                                                             bool
+	)
+
 	flag.StringVar(&serverURL, "a", ":8080", ":<port>")
 	flag.StringVar(&baseURL, "b", "http://localhost:8080/", "Base URL for the API. Example: http://localhost:8080/")
 	flag.StringVar(&logLevel, "l", "info", "Log level. Example: info, debug, error")
-	flag.StringVar(&fileStoragePath, "f", "", "File storage path")
-	flag.StringVar(&databaseAdr, "d", "", "Database connection string")
 	flag.StringVar(&auditFile, "audit-file", "", "File path for audit")
 	flag.StringVar(&auditURL, "audit-url", "", "URL for audit")
-	flag.BoolVar(&enableHTTPS, "s", false, "Enable HTTPS")
+	flag.StringVar(&fileStorage, "f", "", "File storage path")
+	flag.StringVar(&dbURI, "d", "", "Database connection string")
+	// flag.StringVar(&fileStorage, "f", "/tmp/links.json", "File storage path")
+	// flag.StringVar(&dbURI, "d", "postgres://postgres:12345@localhost:5432/shorted_links?sslmode=disable", "Database connection string")
+	flag.BoolVar(&https, "s", false, "Enable HTTPS")
 	// Timeouts
-	flag.IntVar(&deleteDelay, "dd", 100, "Deletion URL delay in milliseconds")
-	flag.IntVar(&deleteStopAfter, "sa", 500, "Stop deletion after N milliseconds")
-	flag.IntVar(&handlerTimeout, "ht", 3, "Timeout for handlers in seconds")
-	flag.IntVar(&testsTimeout, "tt", 3, "Timeout for tests in seconds")
-	flag.IntVar(&workerTimeout, "wt", 3, "Timeout for workers in seconds")
-
-	// flag.StringVar(&fileStoragePath, "f", "/tmp/links.json", "File storage path")
-	// flag.StringVar(&databaseAdr, "d", "postgres://postgres:12345@localhost:5432/shorted_links?sslmode=disable", "Database connection string")
+	flag.IntVar(&deletionDelay, "dd", 100, "Deletion URL delay in milliseconds")
+	flag.IntVar(&stopAfter, "sa", 500, "Stop deletion after N milliseconds")
+	flag.IntVar(&handlerTmt, "ht", 3, "Timeout for handlers in seconds")
+	flag.IntVar(&testsTmt, "tt", 3, "Timeout for tests in seconds")
+	flag.IntVar(&workerTmt, "wt", 3, "Timeout for workers in seconds")
 	flag.Parse()
 
-	// Timeouts
-	if cfg.DeleteURLDelay == 0 {
-		cfg.DeleteURLDelay = time.Duration(deleteDelay) * time.Millisecond
-	}
-	if cfg.DeleteURLStopAfter == 0 {
-		cfg.DeleteURLStopAfter = time.Duration(deleteStopAfter) * time.Millisecond
-	}
-	if cfg.HandlerCtxTimeout == 0 {
-		cfg.HandlerCtxTimeout = time.Duration(handlerTimeout) * time.Second
-	}
-	if cfg.TestsTimeout == 0 {
-		cfg.TestsTimeout = time.Duration(testsTimeout) * time.Second
-	}
-	if cfg.WorkerTimeout == 0 {
-		cfg.WorkerTimeout = time.Duration(workerTimeout) * time.Second
-	}
+	applyIfEmpty(&cfg.ServerURL, serverURL)
+	applyIfEmpty(&cfg.BaseURL, baseURL)
+	applyIfEmpty(&cfg.LogLevel, logLevel)
+	applyIfEmpty(&cfg.DatabaseAdr, dbURI)
+	applyIfEmpty(&cfg.AuditURL, auditURL)
+	
+	applyPathIfEmpty(&cfg.FileStoragePath, fileStorage)
+	applyPathIfEmpty(&cfg.AuditFile, auditFile)
 
-	if cfg.ServerURL == "" {
-		cfg.ServerURL = serverURL
-	}
-	if cfg.BaseURL == "" {
-		cfg.BaseURL = baseURL
-	}
-	if cfg.LogLevel == "" {
-		cfg.LogLevel = logLevel
-	}
-	if cfg.FileStoragePath == "" && fileStoragePath != "" {
-		dir, err := os.Getwd()
-		if err != nil {
-			return nil, err
-		}
-		cfg.FileStoragePath = filepath.Join(dir, fileStoragePath)
-	}
-	if cfg.DatabaseAdr == "" {
-		cfg.DatabaseAdr = databaseAdr
-	}
-	if cfg.AuditFile == "" && auditFile != "" {
-		dir, err := os.Getwd()
-		if err != nil {
-			return nil, err
-		}
-		cfg.AuditFile = filepath.Join(dir, auditFile)
-	}
-	if cfg.AuditURL == "" {
-		cfg.AuditURL = auditURL
-	}
+	applyDurationMs(&cfg.DeleteURLDelay, deletionDelay)
+	applyDurationMs(&cfg.DeleteURLStopAfter, stopAfter)
+	applyDurationSec(&cfg.HandlerCtxTimeout, handlerTmt)
+	applyDurationSec(&cfg.TestsTimeout, testsTmt)
+	applyDurationSec(&cfg.WorkerTimeout, workerTmt)
+
 	if cfg.EnableHTTPS == nil {
-		cfg.EnableHTTPS = &enableHTTPS
+		cfg.EnableHTTPS = &https
 	}
 	if cfg.JWTSecret == "" {
 		cfg.JWTSecret = "secret"
 	}
 
 	return &cfg, nil
+}
+
+func applyIfEmpty(dst *string, src string) {
+	if *dst == "" && src != "" {
+		*dst = src
+	}
+}
+
+func applyPathIfEmpty(dst *string, src string) {
+	if *dst == "" && src != "" {
+		dir, _ := os.Getwd()
+		*dst = filepath.Join(dir, src)
+	}
+}
+
+func applyDurationMs(dst *time.Duration, src int) {
+	if *dst == 0 && src != 0 {
+		*dst = time.Duration(src) * time.Millisecond
+	}
+}
+
+func applyDurationSec(dst *time.Duration, src int) {
+	if *dst == 0 && src != 0 {
+		*dst = time.Duration(src) * time.Second
+	}
 }
