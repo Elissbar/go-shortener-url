@@ -77,6 +77,9 @@ func loadFlags(cfg *Config) (*Config, error) {
 		flag.StringVar(&cfg.DatabaseAdr, "d", "", "Database connection string")
 		// flag.StringVar(&cfg.DatabaseAdr, "d", "postgres://postgres:12345@localhost:5432/shorted_links?sslmode=disable", "Database connection string")
 	}
+	if cfg.JWTSecret == "" {
+		cfg.JWTSecret = "secret"
+	}
 	if cfg.EnableHTTPS == nil {
 		flag.BoolVar(cfg.EnableHTTPS, "s", false, "Enable HTTPS")
 	}

@@ -347,5 +347,7 @@ func (h *MyHandler) DeleteURLs(rw http.ResponseWriter, req *http.Request) {
 		case <-time.After(h.Service.Config.DeleteURLStopAfter):
 			http.Error(rw, "Service busy", http.StatusServiceUnavailable)
 		}
+	case <-req.Context().Done():
+		close(h.Service.DeleteCh)
 	}
 }

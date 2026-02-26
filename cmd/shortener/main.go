@@ -1,8 +1,14 @@
 package main
 
 import (
+	"context"
 	"fmt"
+	"net"
 	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	// "os"
 	"reflect"
@@ -13,6 +19,7 @@ import (
 	"github.com/Elissbar/go-shortener-url/internal/observer"
 	"github.com/Elissbar/go-shortener-url/internal/repository/patterns"
 	"github.com/Elissbar/go-shortener-url/internal/service"
+	"golang.org/x/sync/errgroup"
 	// _ "net/http/pprof"
 )
 
@@ -32,7 +39,8 @@ func main() {
 	//     http.ListenAndServe("localhost:6060", nil)
 	// }()
 
-	// os.Exit(1)
+	shutdownCtx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT, syscall.SIGQUIT)
+	defer stop()
 
 	fmt.Printf("Build version: %s\n", buildVersion)
 	fmt.Printf("Build date: %s\n", buildDate)
@@ -67,18 +75,54 @@ func main() {
 
 	srvc := service.NewService(cfg, log, storage, event)
 	defer srvc.Helper.Close()
-	go srvc.ProcessDeletions()
+	go srvc.ProcessDeletions(shutdownCtx)
 
-	myHandler := handler.NewHandler(srvc)
+	// myHandler := handler.NewHandler(srvc)
 
-	if cfg.EnableHTTPS != nil && (*cfg.EnableHTTPS) {
-		fmt.Println("🚀 HTTPS on :8080")
-		err = http.ListenAndServeTLS(srvc.Config.ServerURL, "cert.pem", "key.pem", myHandler.Router())
-	} else {
-		fmt.Println("🚀 HTTP on :8080")
-		err = http.ListenAndServe(srvc.Config.ServerURL, myHandler.Router())
+	httpServer := &http.Server{
+		Addr: cfg.ServerURL,
+		BaseContext: func(_ net.Listener) context.Context {
+			return shutdownCtx
+		},
+		Handler: handler.NewHandler(srvc).Router(),
 	}
-	if err != nil {
-		panic(err)
+
+	g, gCtx := errgroup.WithContext(shutdownCtx)
+	g.Go(func() error {
+		if cfg.EnableHTTPS != nil && (*cfg.EnableHTTPS) {
+			log.Infof("🚀 HTTPS mode. Server started on %s", cfg.ServerURL)
+			// err = http.ListenAndServeTLS(srvc.Config.ServerURL, "cert.pem", "key.pem", myHandler.Router())
+			if err := httpServer.ListenAndServeTLS("cert.pem", "key.pem"); err != nil && err != http.ErrServerClosed {
+				return fmt.Errorf("server error: %w", err)
+			}
+		} else {
+			log.Infof("🚀 HTTP mode. Server started on %s", cfg.ServerURL)
+			// err = http.ListenAndServe(srvc.Config.ServerURL, myHandler.Router())
+			if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+				return fmt.Errorf("server error: %w", err)
+			}
+		}
+		return nil
+	})
+	g.Go(func() error {
+		<-gCtx.Done()
+		srvc.Logger.Info("Shutting down server...")
+
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+		defer cancel()
+
+		if err := httpServer.Shutdown(ctx); err != nil {
+			return fmt.Errorf("shutdown error: %w", err)
+		}
+
+		log.Info("Server stopped")
+		return nil
+	})
+
+	if err := g.Wait(); err != nil {
+		srvc.Logger.Errorf("Application error: %v", err)
+		os.Exit(1)
 	}
+
+	log.Info("Application stopped")
 }
