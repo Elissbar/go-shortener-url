@@ -34,8 +34,9 @@ func NewService(cfg *config.Config, log *zap.SugaredLogger, storage repository.S
 		Logger:   log,
 		Storage:  storage,
 		Event:    event,
-		Helper:   &Helper{Storage: &storage},
 		DeleteCh: make(chan DeleteRequest, 1000),
+		wg:       &sync.WaitGroup{},
+		Helper:   &Helper{Storage: &storage},
 	}
 }
 
@@ -92,7 +93,7 @@ func (s *Service) ProcessDeletions(ctx context.Context) {
 
 	// Ждём завершения воркеров
 	s.wg.Wait()
-    s.Logger.Info("All deletion workers finished")
+	s.Logger.Info("All deletion workers finished")
 }
 
 func (s *Service) deletionWorker(ctx context.Context, workerID int, wg *sync.WaitGroup) {
@@ -100,41 +101,22 @@ func (s *Service) deletionWorker(ctx context.Context, workerID int, wg *sync.Wai
 
 	for {
 		select {
-		case deleteReq, ok := <- s.DeleteCh:
+		case deleteReq, ok := <-s.DeleteCh:
 			if !ok {
 				s.Logger.Infow("Deletion channel closed", "workerID", workerID)
-                return
+				return
 			}
-			
+
 			workerCtx, cancel := context.WithTimeout(ctx, s.Config.WorkerTimeout)
 			err := s.Storage.DeleteByTokens(workerCtx, deleteReq.UserID, deleteReq.Tokens)
 			cancel()
 
 			if err != nil {
-                s.Logger.Errorw("Deletion failed", "workerID", workerID, "error", err)
-            }
+				s.Logger.Errorw("Deletion failed", "workerID", workerID, "error", err)
+			}
 		case <-ctx.Done():
 			s.Logger.Infow("Worker shutting down", "workerID", workerID)
 			return
 		}
 	}
-	// for deleteReq := range s.DeleteCh {
-	// 	if len(deleteReq.Tokens) == 0 {
-	// 		continue
-	// 	}
-		
-
-	// 	// Быстрое выполнение без буферизации
-	// 	ctx, cancel := context.WithTimeout(context.Background(), s.Config.WorkerTimeout)
-	// 	err := s.Storage.DeleteByTokens(ctx, deleteReq.UserID, deleteReq.Tokens)
-	// 	cancel()
-
-	// 	if err != nil {
-	// 		s.Logger.Errorw("Deletion failed",
-	// 			"workerID", workerID,
-	// 			"userID", deleteReq.UserID,
-	// 			"tokenCount", len(deleteReq.Tokens),
-	// 			"error", err)
-	// 	}
-	// }
 }

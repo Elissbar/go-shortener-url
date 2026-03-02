@@ -77,8 +77,6 @@ func main() {
 	defer srvc.Helper.Close()
 	go srvc.ProcessDeletions(shutdownCtx)
 
-	// myHandler := handler.NewHandler(srvc)
-
 	httpServer := &http.Server{
 		Addr: cfg.ServerURL,
 		BaseContext: func(_ net.Listener) context.Context {
@@ -114,6 +112,7 @@ func main() {
 		if err := httpServer.Shutdown(ctx); err != nil {
 			return fmt.Errorf("shutdown error: %w", err)
 		}
+		close(srvc.DeleteCh)
 
 		log.Info("Server stopped")
 		return nil

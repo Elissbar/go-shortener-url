@@ -80,11 +80,14 @@ func loadFlags(cfg *Config) (*Config, error) {
 	if cfg.JWTSecret == "" {
 		cfg.JWTSecret = "secret"
 	}
-	if cfg.EnableHTTPS == nil {
-		flag.BoolVar(cfg.EnableHTTPS, "s", false, "Enable HTTPS")
-	}
 	if cfg.ConfigFile == "" {
 		flag.StringVar(&cfg.ConfigFile, "c", "", "Config File")
+	}
+
+	if cfg.EnableHTTPS == nil {
+		var https bool
+		flag.BoolVar(&https, "s", false, "Enable HTTPS")
+		cfg.EnableHTTPS = &https
 	}
 
 	// Timeouts
