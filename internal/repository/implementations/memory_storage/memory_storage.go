@@ -50,6 +50,10 @@ func (ms *MemoryStorage) GetAllUsersURLs(ctx context.Context, userID string) ([]
 	return []model.URLRecord{}, nil
 }
 
+func (ms *MemoryStorage) GetCount(ctx context.Context, key string) (int64, error) {
+	return 0, nil
+}
+
 func (ms *MemoryStorage) DeleteByTokens(ctx context.Context, userID string, tokens []string) error {
 	return nil
 }

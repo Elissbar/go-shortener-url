@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"net"
 	"net/http"
 	"time"
 
@@ -41,6 +42,7 @@ func (h *MyHandler) Router() chi.Router {
 	r.Get("/", h.GetRoot)
 	r.Get("/ping", h.CheckConnectionDB)
 	r.Get("/api/user/urls", h.GetAllUserURLs)
+	r.Get("/api/internal/stats", h.GetStats)
 	r.Delete("/api/user/urls", h.DeleteURLs)
 
 	return r
@@ -50,6 +52,56 @@ func (h *MyHandler) GetRoot(rw http.ResponseWriter, req *http.Request) {
 	if req.Method == http.MethodGet {
 		rw.Write([]byte("URL Shortener is running!"))
 	}
+}
+
+func (h *MyHandler) GetStats(rw http.ResponseWriter, req *http.Request) {
+	if h.Service.Config.TrustedSubnet == "" {
+		rw.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+
+	realIP := req.Header.Get("X-Real-IP")
+	ip := net.ParseIP(realIP)
+	_, ipNet, err := net.ParseCIDR(h.Service.Config.TrustedSubnet)
+	if err != nil {
+		http.Error(rw, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	if ip == nil || !ipNet.Contains(ip) {
+		rw.WriteHeader(http.StatusForbidden)
+		return
+	}
+
+	_, ctx, cancel, err := prepareHandler(req, h.Service.Config.HandlerCtxTimeout)
+	defer cancel()
+	if err != nil {
+		http.Error(rw, "1: Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	usersCnt, err := h.Service.Storage.GetCount(ctx, "user_id")
+	if err != nil {
+		http.Error(rw, "2: Internal server error", http.StatusInternalServerError)
+		return
+	}
+	shortedLinksCnt, err := h.Service.Storage.GetCount(ctx, "shorted_url")
+	if err != nil {
+		http.Error(rw, "3: Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	response := map[string]int64{
+		"urls":  shortedLinksCnt,
+		"users": usersCnt,
+	}
+	data, err := json.Marshal(response)
+	if err != nil {
+		http.Error(rw, "4: Error: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	rw.Header().Set("Content-Type", "application/json")
+	rw.Write(data)
 }
 
 // @Summary Запрос для сокращения ссылки.

@@ -1,1 +1,0 @@
-ALTER TABLE shorted_links ADD CONSTRAINT unique_token UNIQUE (token);

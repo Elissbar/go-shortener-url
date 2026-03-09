@@ -16,6 +16,7 @@ require (
 	github.com/swaggo/swag v1.16.6
 	github.com/tomarrell/wrapcheck v1.2.0
 	go.uber.org/zap v1.27.0
+	golang.org/x/sync v0.19.0
 	golang.org/x/tools v0.41.0
 	honnef.co/go/tools v0.6.1
 )
@@ -41,7 +42,6 @@ require (
 	golang.org/x/exp/typeparams v0.0.0-20231108232855-2478ac86f678 // indirect
 	golang.org/x/mod v0.32.0 // indirect
 	golang.org/x/net v0.49.0 // indirect
-	golang.org/x/sync v0.19.0 // indirect
 	golang.org/x/text v0.33.0 // indirect
 	golang.org/x/tools/go/expect v0.1.1-deprecated // indirect
 	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c // indirect

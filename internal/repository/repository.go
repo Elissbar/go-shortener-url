@@ -15,6 +15,7 @@ type Storage interface {
 type Reader interface {
 	Get(ctx context.Context, token string) (string, error)
 	GetAllUsersURLs(ctx context.Context, userID string) ([]model.URLRecord, error)
+	GetCount(ctx context.Context, key string) (int64, error)
 }
 
 type Writer interface {

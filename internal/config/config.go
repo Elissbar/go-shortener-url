@@ -17,6 +17,7 @@ type ConfigFile struct {
 	FileStoragePath string `json:"file_storage_path"`
 	DBDSN           string `json:"database_dsn"`
 	EnableHTTPS     bool   `json:"enable_https"`
+	TrustedSubnet   string `json:"trusted_subnet"`
 }
 
 // generate:reset
@@ -31,6 +32,7 @@ type Config struct {
 	AuditURL        string `env:"AUDIT_URL"`
 	EnableHTTPS     *bool  `env:"ENABLE_HTTPS"`
 	ConfigFile      string `env:"CONFIG"`
+	TrustedSubnet   string `env:"TRUSTED_SUBNET"`
 	// Timeouts
 	DeleteURLDelay     time.Duration
 	DeleteURLStopAfter time.Duration
@@ -39,15 +41,15 @@ type Config struct {
 	WorkerTimeout      time.Duration
 }
 
-func loadEnv(cfg *Config) (*Config, error) {
-	err := env.Parse(&cfg)
+func loadEnv(cfg *Config) error {
+	err := env.Parse(cfg)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	return cfg, nil
+	return nil
 }
 
-func loadFlags(cfg *Config) (*Config, error) {
+func loadFlags(cfg *Config) error {
 	if cfg.ServerURL == "" {
 		flag.StringVar(&cfg.ServerURL, "a", ":8080", ":<port>")
 	}
@@ -66,7 +68,7 @@ func loadFlags(cfg *Config) (*Config, error) {
 	if cfg.FileStoragePath == "" {
 		dir, err := os.Getwd()
 		if err != nil {
-			return nil, fmt.Errorf("error get wd: %s", err)
+			return fmt.Errorf("error get wd: %s", err)
 		}
 		var src string
 		flag.StringVar(&src, "f", "", "File storage path")
@@ -74,11 +76,14 @@ func loadFlags(cfg *Config) (*Config, error) {
 		// flag.StringVar(&cfg.FileStoragePath, "f", "/tmp/links.json", "File storage path")
 	}
 	if cfg.DatabaseAdr == "" {
-		flag.StringVar(&cfg.DatabaseAdr, "d", "", "Database connection string")
-		// flag.StringVar(&cfg.DatabaseAdr, "d", "postgres://postgres:12345@localhost:5432/shorted_links?sslmode=disable", "Database connection string")
+		// flag.StringVar(&cfg.DatabaseAdr, "d", "", "Database connection string")
+		flag.StringVar(&cfg.DatabaseAdr, "d", "postgres://postgres:12345@localhost:5432/shorted_links?sslmode=disable", "Database connection string")
 	}
 	if cfg.JWTSecret == "" {
 		cfg.JWTSecret = "secret"
+	}
+	if cfg.TrustedSubnet == "" {
+		flag.StringVar(&cfg.TrustedSubnet, "t", "", "CIDR (Доверенная подсеть)")
 	}
 	if cfg.ConfigFile == "" {
 		flag.StringVar(&cfg.ConfigFile, "c", "", "Config File")
@@ -98,22 +103,22 @@ func loadFlags(cfg *Config) (*Config, error) {
 	flag.DurationVar(&cfg.WorkerTimeout, "wt", 3*time.Second, "Timeout for workers in seconds")
 	flag.Parse()
 
-	return cfg, nil
+	return nil
 }
 
-func loadFile(cfg *Config) *Config {
+func loadFile(cfg *Config) error {
 	if cfg.ConfigFile == "" {
 		return nil
 	}
 
 	data, err := os.ReadFile(cfg.ConfigFile)
 	if err != nil {
-		return nil
+		return err
 	}
 
 	var cfgFile ConfigFile
 	if err := json.Unmarshal(data, &cfgFile); err != nil {
-		return nil
+		return err
 	}
 
 	if cfg.ServerURL == "" {
@@ -131,24 +136,30 @@ func loadFile(cfg *Config) *Config {
 	if cfg.EnableHTTPS == nil {
 		cfg.EnableHTTPS = &cfgFile.EnableHTTPS
 	}
+	if cfg.TrustedSubnet == "" {
+		cfg.TrustedSubnet = cfgFile.TrustedSubnet
+	}
 
-	return cfg
+	return nil
 }
 
 func NewConfig() (*Config, error) {
-	var cfg *Config
+	cfg := &Config{}
 
-	cfg, err := loadEnv(cfg)
+	err := loadEnv(cfg)
 	if err != nil {
 		return nil, err
 	}
 
-	cfg, err = loadFlags(cfg)
+	err = loadFlags(cfg)
 	if err != nil {
 		return nil, err
 	}
 
-	cfg = loadFile(cfg)
+	err = loadFile(cfg)
+	if err != nil {
+		return nil, err
+	}
 
 	return cfg, nil
 }

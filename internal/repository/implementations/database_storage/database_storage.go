@@ -183,3 +183,16 @@ func (db *DBStorage) DeleteByTokens(ctx context.Context, userID string, tokens [
 		"userID", userID)
 	return nil
 }
+
+func (db *DBStorage) GetCount(ctx context.Context, key string) (int64, error) {
+	var count int64
+	query := fmt.Sprintf("SELECT COUNT(*) FROM shorted_links WHERE %s IS NOT NULL", key)
+	err := db.DB.QueryRowContext(ctx, query).Scan(&count)
+	fmt.Println("DB RES:", count, key, err)
+	if err != nil {
+		return 0, fmt.Errorf("error get rows count by field")
+	}
+	// count, _ := result.RowsAffected()
+	// return count, nil
+	return count, nil
+}
