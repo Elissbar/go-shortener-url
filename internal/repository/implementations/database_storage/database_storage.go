@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"slices"
 
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database/postgres"
@@ -185,6 +186,10 @@ func (db *DBStorage) DeleteByTokens(ctx context.Context, userID string, tokens [
 }
 
 func (db *DBStorage) GetCount(ctx context.Context, key string) (int64, error) {
+	allowedFields := []string{"user_id", "shorted_url"}
+	if !slices.Contains(allowedFields, key) {
+		return 0, fmt.Errorf("field is not allowed")
+	}
 	var count int64
 	query := fmt.Sprintf("SELECT COUNT(*) FROM shorted_links WHERE %s IS NOT NULL", key)
 	err := db.DB.QueryRowContext(ctx, query).Scan(&count)
