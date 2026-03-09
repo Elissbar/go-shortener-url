@@ -50,7 +50,6 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	fmt.Println(cfg.TrustedSubnet)
 
 	log, err := logger.NewSugaredLogger(cfg.LogLevel)
 	if err != nil {

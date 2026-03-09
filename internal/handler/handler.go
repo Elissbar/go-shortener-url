@@ -75,18 +75,18 @@ func (h *MyHandler) GetStats(rw http.ResponseWriter, req *http.Request) {
 	_, ctx, cancel, err := prepareHandler(req, h.Service.Config.HandlerCtxTimeout)
 	defer cancel()
 	if err != nil {
-		http.Error(rw, "1: Internal server error", http.StatusInternalServerError)
+		http.Error(rw, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 
 	usersCnt, err := h.Service.Storage.GetCount(ctx, "user_id")
 	if err != nil {
-		http.Error(rw, "2: Internal server error", http.StatusInternalServerError)
+		http.Error(rw, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 	shortedLinksCnt, err := h.Service.Storage.GetCount(ctx, "shorted_url")
 	if err != nil {
-		http.Error(rw, "3: Internal server error", http.StatusInternalServerError)
+		http.Error(rw, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 
@@ -96,7 +96,7 @@ func (h *MyHandler) GetStats(rw http.ResponseWriter, req *http.Request) {
 	}
 	data, err := json.Marshal(response)
 	if err != nil {
-		http.Error(rw, "4: Error: "+err.Error(), http.StatusInternalServerError)
+		http.Error(rw, "Error: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
