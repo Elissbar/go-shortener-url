@@ -1,7 +1,7 @@
 module github.com/Elissbar/go-shortener-url
 
-// go 1.25.2
-go 1.24.8
+go 1.25.2
+// go 1.24.8
 
 require (
 	github.com/caarlos0/env/v11 v11.3.1
