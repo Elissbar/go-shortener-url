@@ -4,7 +4,10 @@ import "errors"
 
 // Кастомные ошибки для обрабоки в хендлерах.
 var (
-	ErrURLExists      error = errors.New("URL already exists")  // Ошибка сохранения существующего URL.
-	ErrTokenIsDeleted error = errors.New("token is deleted")    // Ошибка возникающая при попытке получения удаленного токена (ссылки).
-	ErrTokenNotExist  error = errors.New("token is not exists") // Ошибка при попытке получения несуществующего токена (ссылки).
+	// Ошибка сохранения существующего URL.
+	ErrURLExists error = errors.New("URL already exists")
+	// Ошибка возникающая при попытке получения удаленного токена (ссылки).
+	ErrTokenIsDeleted error = errors.New("token is deleted")
+	// Ошибка при попытке получения несуществующего токена (ссылки).
+	ErrTokenNotExist error = errors.New("token is not exists")
 )
