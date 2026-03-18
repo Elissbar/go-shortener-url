@@ -46,7 +46,7 @@ func (ms *MemoryStorage) Get(ctx context.Context, token string) (string, error) 
 	return "", repository.ErrTokenNotExist
 }
 
-func (ms *MemoryStorage) GetAllUsersURLs(ctx context.Context, userID string) ([]model.URLRecord, error) {
+func (ms *MemoryStorage) GetAllUserURLs(ctx context.Context, userID string) ([]model.URLRecord, error) {
 	return []model.URLRecord{}, nil
 }
 

@@ -2,11 +2,9 @@ package service
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"strings"
+	"net"
 	"sync"
 	"time"
 
@@ -46,7 +44,7 @@ func NewService(cfg *config.Config, log *zap.SugaredLogger, storage repository.S
 }
 
 func (s *Service) CreateShortURLJSON(ctx context.Context, rq model.Request, userID string) ([]byte, error) {
-	baseURL := s.getFullBaseURL(s.Config.BaseURL)
+	baseURL := getFullBaseURL(s.Config.BaseURL)
 	token, err := s.GetToken(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("error get token: %w", err)
@@ -65,13 +63,13 @@ func (s *Service) CreateShortURLJSON(ctx context.Context, rq model.Request, user
 		return nil, fmt.Errorf("error marshal response: %w", err)
 	}
 
-	s.audit(s.Event, "shorten", userID, rq.URL)
+	audit(s.Event, "shorten", userID, rq.URL)
 
 	return data, nil
 }
 
-func (s *Service) CreateShortBatch(ctx context.Context, reqBatch []model.ReqBatch, userID string) ([]model.RespBatch, error) {
-	baseURL := s.getFullBaseURL(s.Config.BaseURL)
+func (s *Service) CreateShortBatch(ctx context.Context, reqBatch []model.ReqBatch, userID string) ([]byte, error) {
+	baseURL := getFullBaseURL(s.Config.BaseURL)
 
 	respBatch := make([]model.RespBatch, 0, len(reqBatch))
 	for i := range len(reqBatch) {
@@ -90,11 +88,16 @@ func (s *Service) CreateShortBatch(ctx context.Context, reqBatch []model.ReqBatc
 	if err != nil {
 		return nil, err
 	}
-	return respBatch, nil
+
+	data, err := json.Marshal(respBatch)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling batch: %w", err)
+	}
+	return data, nil
 }
 
 func (s *Service) CreateShortURL(ctx context.Context, body []byte, userID string) (string, error) {
-	baseURL := s.getFullBaseURL(s.Config.BaseURL)
+	baseURL := getFullBaseURL(s.Config.BaseURL)
 	token, err := s.GetToken(ctx)
 	if err != nil {
 		return "", fmt.Errorf("error get token: %w", err)
@@ -105,7 +108,7 @@ func (s *Service) CreateShortURL(ctx context.Context, body []byte, userID string
 		return "", err
 	}
 
-	s.audit(s.Event, "shorten", userID, string(body))
+	audit(s.Event, "shorten", userID, string(body))
 	return baseURL + savedToken, nil
 }
 
@@ -117,26 +120,88 @@ func (s *Service) GetShortURL(ctx context.Context, urlID, userID string) (string
 		return "", err
 	}
 
-	s.audit(s.Event, "follow", userID, url)
+	audit(s.Event, "follow", userID, url)
 	s.Logger.Infow("Redirecting token", "token", urlID, "url", url)
 	return url, err
 }
 
-func (s *Service) audit(event *observer.Event, action, userID, url string) {
-	event.Update(model.AuditRequest{
-		TS:     time.Now().Unix(),
-		Action: action,
-		UserID: userID,
-		URL:    url,
-	})
+func (s *Service) GetAllUserURLs(ctx context.Context, userID string) ([]byte, error) {
+	records, err := s.Storage.GetAllUserURLs(ctx, userID)
+	if err != nil {
+		return nil, fmt.Errorf("error get all user's URLs: %w", err)
+	}
+
+	if len(records) == 0 {
+		return nil, repository.ErrUserHasNoURL
+	}
+
+	data, err := json.Marshal(records)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling records")
+	}
+	return data, nil
 }
 
-func (s *Service) getFullBaseURL(baseURL string) string {
-	fullURL := baseURL
-	if !strings.HasSuffix(baseURL, "/") {
-		fullURL = baseURL + "/"
+func (s *Service) DeleteURLs(userID string, tokens []string) error {
+	// if len(tokens) == 0 {
+	// 	rw.WriteHeader(http.StatusAccepted)
+	// 	return
+	// }
+
+	// Создаем запрос
+	deleteReq := DeleteRequest{
+		UserID: userID,
+		Tokens: tokens,
 	}
-	return fullURL
+
+	timeout := time.After(s.Config.DeleteURLDelay)
+	select {
+	case s.DeleteCh <- deleteReq:
+		// rw.WriteHeader(http.StatusAccepted)
+	case <-timeout:
+		// Если канал полон, ждем с таймаутом
+		select {
+		case s.DeleteCh <- deleteReq:
+			// rw.WriteHeader(http.StatusAccepted)
+		case <-time.After(s.Config.DeleteURLStopAfter):
+			// http.Error(rw, "Service busy", http.StatusServiceUnavailable)
+			return fmt.Errorf("service busy")
+		}
+	}
+	return nil
+}
+
+func (s *Service) GetStats(ctx context.Context, realIP string) ([]byte, error) {
+	ip := net.ParseIP(realIP)
+	_, ipNet, err := net.ParseCIDR(s.Config.TrustedSubnet)
+	if err != nil {
+		return nil, fmt.Errorf("internal server error")
+	}
+	if ip == nil || !ipNet.Contains(ip) {
+		return nil, repository.ErrSubnetForbidden
+	}
+
+	ctx, cancel := context.WithTimeout(ctx, time.Second*3)
+	defer cancel()
+
+	usersCnt, err := s.Storage.GetCount(ctx, "user_id")
+	if err != nil {
+		return nil, fmt.Errorf("error get user_id count")
+	}
+	shortedLinksCnt, err := s.Storage.GetCount(ctx, "shorted_url")
+	if err != nil {
+		return nil, fmt.Errorf("error get shorted_url count")
+	}
+
+	response := map[string]int64{
+		"urls":  shortedLinksCnt,
+		"users": usersCnt,
+	}
+	data, err := json.Marshal(response)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling response")
+	}
+	return data, nil
 }
 
 func (s *Service) GetToken(ctx context.Context) (string, error) {
@@ -144,7 +209,7 @@ func (s *Service) GetToken(ctx context.Context) (string, error) {
 	var token string
 
 	for at := 0; at < maxAttempts; at++ {
-		token, err := s.GenerateToken(8)
+		token, err := GenerateToken(8)
 		if err != nil {
 			return "", err
 		}
@@ -157,22 +222,6 @@ func (s *Service) GetToken(ctx context.Context) (string, error) {
 			return "", err
 		}
 	}
-	return token, nil
-}
-
-func (s *Service) GenerateToken(size int) (string, error) {
-	// Генерируем токен - id короткой ссылки
-	if size <= 0 {
-		return "", nil
-	}
-	b := make([]byte, size)
-	_, err := rand.Read(b)
-	if err != nil {
-		return "", err
-	}
-
-	token := base64.URLEncoding.EncodeToString(b)
-	token = token[:len(token)-1]
 	return token, nil
 }
 

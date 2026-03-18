@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
-	"net"
 	"net/http"
 	"time"
 
@@ -62,37 +61,12 @@ func (h *MyHandler) GetStats(rw http.ResponseWriter, req *http.Request) {
 	}
 
 	realIP := req.Header.Get("X-Real-IP")
-	ip := net.ParseIP(realIP)
-	_, ipNet, err := net.ParseCIDR(h.Service.Config.TrustedSubnet)
+	data, err := h.Service.GetStats(req.Context(), realIP)
 	if err != nil {
-		http.Error(rw, "Internal server error", http.StatusInternalServerError)
-		return
-	}
-	if ip == nil || !ipNet.Contains(ip) {
-		rw.WriteHeader(http.StatusForbidden)
-		return
-	}
-
-	ctx, cancel := context.WithTimeout(req.Context(), time.Second*3)
-	defer cancel()
-
-	usersCnt, err := h.Service.Storage.GetCount(ctx, "user_id")
-	if err != nil {
-		http.Error(rw, "Internal server error", http.StatusInternalServerError)
-		return
-	}
-	shortedLinksCnt, err := h.Service.Storage.GetCount(ctx, "shorted_url")
-	if err != nil {
-		http.Error(rw, "Internal server error", http.StatusInternalServerError)
-		return
-	}
-
-	response := map[string]int64{
-		"urls":  shortedLinksCnt,
-		"users": usersCnt,
-	}
-	data, err := json.Marshal(response)
-	if err != nil {
+		if errors.Is(err, repository.ErrSubnetForbidden) {
+			rw.WriteHeader(http.StatusForbidden)
+			return
+		}
 		http.Error(rw, "Error: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -125,12 +99,6 @@ func (h *MyHandler) CreateShortURLJSON(rw http.ResponseWriter, req *http.Request
 			return
 		}
 
-		// token, err := h.Service.GetToken(ctx)
-		// if err != nil {
-		// 	http.Error(rw, "Error: "+err.Error(), http.StatusInternalServerError)
-		// 	return
-		// }
-
 		var rq model.Request
 		dec := json.NewDecoder(req.Body)
 		if err := dec.Decode(&rq); err != nil {
@@ -145,26 +113,6 @@ func (h *MyHandler) CreateShortURLJSON(rw http.ResponseWriter, req *http.Request
 		} else {
 			rw.WriteHeader(http.StatusCreated)
 		}
-
-		// baseURL := getFullBaseURL(h.Service.Config.BaseURL)
-
-		// savedToken, err := h.Service.Storage.Save(ctx, token, rq.URL, userID, baseURL)
-		// if err != nil && errors.Is(err, repository.ErrURLExists) {
-		// rw.WriteHeader(http.StatusConflict)
-		// } else {
-		// rw.WriteHeader(http.StatusCreated)
-		// }
-
-		// var resp model.Response
-		// resp.Result = baseURL + savedToken
-
-		// data, err := json.Marshal(resp)
-		// if err != nil {
-		// http.Error(rw, "Error: "+err.Error(), http.StatusInternalServerError)
-		// return
-		// }
-
-		// audit(h.Service.Event, "shorten", userID, rq.URL)
 
 		rw.Write(data)
 	}
@@ -203,19 +151,12 @@ func (h *MyHandler) CreateShortBatch(rw http.ResponseWriter, req *http.Request) 
 			return
 		}
 
-		respBatch, err := h.Service.CreateShortBatch(ctx, reqBatch, userID)
+		data, err := h.Service.CreateShortBatch(ctx, reqBatch, userID)
 		if err != nil {
 			http.Error(rw, "Error: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
 
-		data, err := json.Marshal(respBatch) // 29 sec
-		if err != nil {
-			http.Error(rw, "Error: "+err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		rw.Header().Set("Content-Type", "application/json")
 		rw.WriteHeader(http.StatusCreated)
 		rw.Write(data)
 	}
@@ -309,21 +250,16 @@ func (h *MyHandler) GetAllUserURLs(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	records, err := h.Service.Storage.GetAllUsersURLs(ctx, userID)
+	data, err := h.Service.GetAllUserURLs(ctx, userID)
 	if err != nil {
+		if errors.Is(err, repository.ErrUserHasNoURL) {
+			rw.WriteHeader(http.StatusNoContent)
+			return
+		}
 		http.Error(rw, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 
-	if len(records) == 0 {
-		rw.WriteHeader(http.StatusNoContent)
-	}
-
-	data, err := json.Marshal(records)
-	if err != nil {
-		http.Error(rw, "Error: "+err.Error(), http.StatusInternalServerError)
-		return
-	}
 	rw.Header().Set("Content-Type", "application/json")
 	rw.Write(data)
 }
@@ -351,28 +287,10 @@ func (h *MyHandler) DeleteURLs(rw http.ResponseWriter, req *http.Request) {
 	}
 
 	// Валидация токенов
-	if len(tokens) == 0 {
-		rw.WriteHeader(http.StatusAccepted)
+	err = h.Service.DeleteURLs(userID, tokens)
+	if err != nil {
+		http.Error(rw, "Error: "+err.Error(), http.StatusServiceUnavailable)
 		return
 	}
-
-	// Создаем запрос
-	deleteReq := service.DeleteRequest{
-		UserID: userID,
-		Tokens: tokens,
-	}
-
-	timeout := time.After(h.Service.Config.DeleteURLDelay)
-	select {
-	case h.Service.DeleteCh <- deleteReq:
-		rw.WriteHeader(http.StatusAccepted)
-	case <-timeout:
-		// Если канал полон, ждем с таймаутом
-		select {
-		case h.Service.DeleteCh <- deleteReq:
-			rw.WriteHeader(http.StatusAccepted)
-		case <-time.After(h.Service.Config.DeleteURLStopAfter):
-			http.Error(rw, "Service busy", http.StatusServiceUnavailable)
-		}
-	}
+	rw.WriteHeader(http.StatusAccepted)
 }

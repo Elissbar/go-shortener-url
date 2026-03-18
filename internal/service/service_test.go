@@ -10,10 +10,10 @@ import (
 )
 
 func TestGenerateToken(t *testing.T) {
-	s := &service.Service{}
+	// s := &service.Service{}
 
 	t.Run("zero size", func(t *testing.T) {
-		token, err := s.GenerateToken(0)
+		token, err := service.GenerateToken(0)
 		if err != nil {
 			t.Fatalf("unexpected error for size 0: %v", err)
 		}
@@ -26,7 +26,7 @@ func TestGenerateToken(t *testing.T) {
 		// Проверяем, что токены разные при разных вызовах
 		tokens := make(map[string]bool)
 		for i := 0; i < 100; i++ {
-			token, err := s.GenerateToken(8)
+			token, err := service.GenerateToken(8)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}

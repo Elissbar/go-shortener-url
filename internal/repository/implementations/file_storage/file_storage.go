@@ -106,7 +106,7 @@ func (fs *FileStorage) Get(ctx context.Context, token string) (string, error) {
 	return "", repository.ErrTokenNotExist
 }
 
-func (fs *FileStorage) GetAllUsersURLs(ctx context.Context, userID string) ([]model.URLRecord, error) {
+func (fs *FileStorage) GetAllUserURLs(ctx context.Context, userID string) ([]model.URLRecord, error) {
 	return []model.URLRecord{}, nil
 }
 

@@ -131,8 +131,8 @@ func (db *DBStorage) Get(ctx context.Context, token string) (string, error) {
 	return url, nil
 }
 
-// GetAllUsersURLs возвращает все сокращенные URL пользователя.
-func (db *DBStorage) GetAllUsersURLs(ctx context.Context, userID string) ([]model.URLRecord, error) {
+// GetAllUserURLs возвращает все сокращенные URL пользователя.
+func (db *DBStorage) GetAllUserURLs(ctx context.Context, userID string) ([]model.URLRecord, error) {
 	rows, err := db.DB.QueryContext(ctx, "SELECT shorted_url, url FROM shorted_links WHERE user_id = $1", userID)
 	if err != nil {
 		return nil, err
