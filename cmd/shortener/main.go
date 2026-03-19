@@ -14,7 +14,8 @@ import (
 	"reflect"
 
 	"github.com/Elissbar/go-shortener-url/internal/config"
-	"github.com/Elissbar/go-shortener-url/internal/handler"
+	httpHandler "github.com/Elissbar/go-shortener-url/internal/handler/http"
+
 	"github.com/Elissbar/go-shortener-url/internal/logger"
 	"github.com/Elissbar/go-shortener-url/internal/observer"
 	"github.com/Elissbar/go-shortener-url/internal/repository/patterns"
@@ -82,7 +83,7 @@ func main() {
 		BaseContext: func(_ net.Listener) context.Context {
 			return shutdownCtx
 		},
-		Handler: handler.NewHandler(srvc).Router(),
+		Handler: httpHandler.NewHandler(srvc).Router(),
 	}
 
 	g, gCtx := errgroup.WithContext(shutdownCtx)

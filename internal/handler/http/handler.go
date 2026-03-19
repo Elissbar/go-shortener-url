@@ -30,8 +30,8 @@ func NewHandler(srvc *service.Service) *MyHandler {
 func (h *MyHandler) Router() chi.Router {
 	r := chi.NewRouter()
 
-	r.Use(h.LoggingMiddleware)
-	r.Use(h.authentication)
+	r.Use(loggingMiddleware(h.Service.Logger))
+	r.Use(authentication(h.Service.Config.JWTSecret))
 	r.Use(ungzipMiddleware)
 	r.Use(gzipMiddleware)
 
