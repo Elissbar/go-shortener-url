@@ -10,6 +10,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/Elissbar/go-shortener-url/internal/handler/common"
 	"github.com/Elissbar/go-shortener-url/internal/model"
 	"github.com/Elissbar/go-shortener-url/internal/repository"
 	"github.com/Elissbar/go-shortener-url/internal/service"
@@ -93,7 +94,7 @@ func (h *MyHandler) CreateShortURLJSON(rw http.ResponseWriter, req *http.Request
 
 		ctx, cancel := context.WithTimeout(req.Context(), time.Second*3)
 		defer cancel()
-		userID, ok := req.Context().Value(userIDKey).(string)
+		userID, ok := req.Context().Value(common.UserIDKey).(string)
 		if !ok {
 			http.Error(rw, "userID type error", http.StatusInternalServerError)
 			return
@@ -107,11 +108,17 @@ func (h *MyHandler) CreateShortURLJSON(rw http.ResponseWriter, req *http.Request
 		}
 		defer req.Body.Close()
 
-		data, err := h.Service.CreateShortURLJSON(ctx, rq, userID)
+		resp, err := h.Service.CreateShortURLJSON(ctx, rq, userID)
 		if err != nil && errors.Is(err, repository.ErrURLExists) {
 			rw.WriteHeader(http.StatusConflict)
 		} else {
 			rw.WriteHeader(http.StatusCreated)
+		}
+
+		data, err := json.Marshal(resp)
+		if err != nil {
+			http.Error(rw, "Error: "+err.Error(), http.StatusInternalServerError)
+			return
 		}
 
 		rw.Write(data)
@@ -131,7 +138,7 @@ func (h *MyHandler) CreateShortBatch(rw http.ResponseWriter, req *http.Request) 
 
 		ctx, cancel := context.WithTimeout(req.Context(), time.Second*3)
 		defer cancel()
-		userID, ok := req.Context().Value(userIDKey).(string)
+		userID, ok := req.Context().Value(common.UserIDKey).(string)
 		if !ok {
 			http.Error(rw, "userID type error", http.StatusInternalServerError)
 			return
@@ -169,7 +176,7 @@ func (h *MyHandler) CreateShortURL(rw http.ResponseWriter, req *http.Request) {
 
 		ctx, cancel := context.WithTimeout(req.Context(), time.Second*3)
 		defer cancel()
-		userID, ok := req.Context().Value(userIDKey).(string)
+		userID, ok := req.Context().Value(common.UserIDKey).(string)
 		if !ok {
 			http.Error(rw, "userID type error", http.StatusInternalServerError)
 			return
@@ -201,7 +208,7 @@ func (h *MyHandler) CreateShortURL(rw http.ResponseWriter, req *http.Request) {
 func (h *MyHandler) GetShortURL(rw http.ResponseWriter, req *http.Request) {
 	ctx, cancel := context.WithTimeout(req.Context(), time.Second*3)
 	defer cancel()
-	userID, ok := req.Context().Value(userIDKey).(string)
+	userID, ok := req.Context().Value(common.UserIDKey).(string)
 	if !ok {
 		http.Error(rw, "userID type error", http.StatusInternalServerError)
 		return
@@ -244,18 +251,24 @@ func (h *MyHandler) CheckConnectionDB(rw http.ResponseWriter, req *http.Request)
 func (h *MyHandler) GetAllUserURLs(rw http.ResponseWriter, req *http.Request) {
 	ctx, cancel := context.WithTimeout(req.Context(), time.Second*3)
 	defer cancel()
-	userID, ok := req.Context().Value(userIDKey).(string)
+	userID, ok := req.Context().Value(common.UserIDKey).(string)
 	if !ok {
 		http.Error(rw, "userID type error", http.StatusInternalServerError)
 		return
 	}
 
-	data, err := h.Service.GetAllUserURLs(ctx, userID)
+	records, err := h.Service.GetAllUserURLs(ctx, userID)
 	if err != nil {
 		if errors.Is(err, repository.ErrUserHasNoURL) {
 			rw.WriteHeader(http.StatusNoContent)
 			return
 		}
+		http.Error(rw, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	data, err := json.Marshal(records)
+	if err != nil {
 		http.Error(rw, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -266,7 +279,7 @@ func (h *MyHandler) GetAllUserURLs(rw http.ResponseWriter, req *http.Request) {
 
 // DeleteURLs принимает список токенов и удаляет их.
 func (h *MyHandler) DeleteURLs(rw http.ResponseWriter, req *http.Request) {
-	userID, ok := req.Context().Value(userIDKey).(string)
+	userID, ok := req.Context().Value(common.UserIDKey).(string)
 	if !ok || userID == "" {
 		http.Error(rw, "Unauthorized", http.StatusUnauthorized)
 		return

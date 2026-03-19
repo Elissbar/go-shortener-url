@@ -8,6 +8,10 @@ import (
 	"github.com/google/uuid"
 )
 
+type contextKey string
+
+const UserIDKey contextKey = "user_id"
+
 type Claims struct {
 	jwt.RegisteredClaims
 	UserID string

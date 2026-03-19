@@ -43,29 +43,22 @@ func NewService(cfg *config.Config, log *zap.SugaredLogger, storage repository.S
 	}
 }
 
-func (s *Service) CreateShortURLJSON(ctx context.Context, rq model.Request, userID string) ([]byte, error) {
+func (s *Service) CreateShortURLJSON(ctx context.Context, rq model.Request, userID string) (model.Response, error) {
+	audit(s.Event, "shorten", userID, rq.URL)
+
 	baseURL := getFullBaseURL(s.Config.BaseURL)
 	token, err := s.GetToken(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("error get token: %w", err)
+		return model.Response{}, fmt.Errorf("error get token: %w", err)
 	}
 
 	savedToken, err := s.Storage.Save(ctx, token, rq.URL, userID, baseURL)
 	if err != nil {
-		return nil, err
+		return model.Response{}, err
 	}
 
-	var resp model.Response
-	resp.Result = baseURL + savedToken
-
-	data, err := json.Marshal(resp)
-	if err != nil {
-		return nil, fmt.Errorf("error marshal response: %w", err)
-	}
-
-	audit(s.Event, "shorten", userID, rq.URL)
-
-	return data, nil
+	resp := model.Response{Result: baseURL + savedToken}
+	return resp, nil
 }
 
 func (s *Service) CreateShortBatch(ctx context.Context, reqBatch []model.ReqBatch, userID string) ([]byte, error) {
@@ -125,7 +118,7 @@ func (s *Service) GetShortURL(ctx context.Context, urlID, userID string) (string
 	return url, err
 }
 
-func (s *Service) GetAllUserURLs(ctx context.Context, userID string) ([]byte, error) {
+func (s *Service) GetAllUserURLs(ctx context.Context, userID string) ([]model.URLRecord, error) {
 	records, err := s.Storage.GetAllUserURLs(ctx, userID)
 	if err != nil {
 		return nil, fmt.Errorf("error get all user's URLs: %w", err)
@@ -135,11 +128,11 @@ func (s *Service) GetAllUserURLs(ctx context.Context, userID string) ([]byte, er
 		return nil, repository.ErrUserHasNoURL
 	}
 
-	data, err := json.Marshal(records)
-	if err != nil {
-		return nil, fmt.Errorf("error marshaling records")
-	}
-	return data, nil
+	// data, err := json.Marshal(records)
+	// if err != nil {
+	// 	return nil, fmt.Errorf("error marshaling records")
+	// }
+	return records, nil
 }
 
 func (s *Service) DeleteURLs(userID string, tokens []string) error {

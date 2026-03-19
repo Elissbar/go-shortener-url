@@ -11,10 +11,6 @@ import (
 	"go.uber.org/zap"
 )
 
-type contextKey string
-
-const userIDKey contextKey = "user_id"
-
 // Кастомный ResponseWriter для gzip
 func gzipMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -130,7 +126,7 @@ func authentication(jwtSecret string) func(handler http.Handler) http.Handler {
 				}
 			}
 
-			ctx := context.WithValue(req.Context(), userIDKey, userID)
+			ctx := context.WithValue(req.Context(), common.UserIDKey, userID)
 			handler.ServeHTTP(w, req.WithContext(ctx))
 		}
 
