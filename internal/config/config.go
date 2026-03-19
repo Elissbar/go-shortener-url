@@ -12,6 +12,7 @@ import (
 )
 
 type ConfigFile struct {
+	AddrGRPC        string `json:"grpc_address"`
 	ServerAddr      string `json:"server_address"`
 	BaseURL         string `json:"base_url"`
 	FileStoragePath string `json:"file_storage_path"`
@@ -22,6 +23,7 @@ type ConfigFile struct {
 
 // generate:reset
 type Config struct {
+	AddrGRPC        string `env:"GRPC_SERVER"`
 	ServerURL       string `env:"SERVER_ADDRESS"`
 	BaseURL         string `env:"BASE_URL"`
 	LogLevel        string `env:"LOG_LEVEL"`
@@ -50,6 +52,9 @@ func loadEnv(cfg *Config) error {
 }
 
 func loadFlags(cfg *Config) error {
+	if cfg.AddrGRPC == "" {
+		flag.StringVar(&cfg.AddrGRPC, "grpc", ":3200", ":<port>")
+	}
 	if cfg.ServerURL == "" {
 		flag.StringVar(&cfg.ServerURL, "a", ":8080", ":<port>")
 	}
@@ -60,7 +65,7 @@ func loadFlags(cfg *Config) error {
 		flag.StringVar(&cfg.LogLevel, "l", "info", "Log level. Example: info, debug, error")
 	}
 	if cfg.AuditFile == "" {
-		flag.StringVar(&cfg.AuditFile, "audit-file", "", "File path for audit")
+		flag.StringVar(&cfg.AuditFile, "audit-file", "audit.json", "File path for audit")
 	}
 	if cfg.AuditURL == "" {
 		flag.StringVar(&cfg.AuditURL, "audit-url", "", "URL for audit")
@@ -121,6 +126,9 @@ func loadFile(cfg *Config) error {
 		return err
 	}
 
+	if cfg.AddrGRPC == "" {
+		cfg.AddrGRPC = cfgFile.AddrGRPC
+	}
 	if cfg.ServerURL == "" {
 		cfg.ServerURL = cfgFile.ServerAddr
 	}

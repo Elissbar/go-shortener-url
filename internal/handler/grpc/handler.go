@@ -13,13 +13,19 @@ import (
 
 type ShortenerServer struct {
 	UnimplementedShortenerServiceServer
-	srvc *service.Service
+	Srvc *service.Service
+}
+
+func NewShortenerServer(srvc *service.Service) *ShortenerServer {
+	return &ShortenerServer{
+		Srvc: srvc,
+	}
 }
 
 func (s *ShortenerServer) ShortenURL(ctx context.Context, in *URLShortenRequest) (*URLShortenResponse, error) {
 	rq := model.Request{URL: in.GetUrl()}
 	userID := ctx.Value(common.UserIDKey).(string)
-	resp, err := s.srvc.CreateShortURLJSON(ctx, rq, userID)
+	resp, err := s.Srvc.CreateShortURLJSON(ctx, rq, userID)
 	if err != nil {
 		return nil, status.Errorf(codes.Unavailable, "Error: %s", err.Error())
 	}
@@ -32,7 +38,7 @@ func (s *ShortenerServer) ShortenURL(ctx context.Context, in *URLShortenRequest)
 func (s *ShortenerServer) ExpandURL(ctx context.Context, in *URLExpandRequest) (*URLExpandResponse, error) {
 	id := in.GetId()
 	userID := ctx.Value(common.UserIDKey).(string)
-	url, err := s.srvc.GetShortURL(ctx, id, userID)
+	url, err := s.Srvc.GetShortURL(ctx, id, userID)
 	if err != nil {
 		return nil, status.Errorf(codes.Unavailable, "Error: %s", err.Error())
 	}
@@ -44,7 +50,7 @@ func (s *ShortenerServer) ExpandURL(ctx context.Context, in *URLExpandRequest) (
 
 func (s *ShortenerServer) ListUserURLs(ctx context.Context, empt *emptypb.Empty) (*UserURLsResponse, error) {
 	userID := ctx.Value(common.UserIDKey).(string)
-	records, err := s.srvc.GetAllUserURLs(ctx, userID)
+	records, err := s.Srvc.GetAllUserURLs(ctx, userID)
 	if err != nil {
 		return nil, status.Errorf(codes.Unavailable, "Error: %s", err.Error())
 	}

@@ -14,7 +14,9 @@ import (
 	"reflect"
 
 	"github.com/Elissbar/go-shortener-url/internal/config"
+	grpcHandler "github.com/Elissbar/go-shortener-url/internal/handler/grpc"
 	httpHandler "github.com/Elissbar/go-shortener-url/internal/handler/http"
+	"google.golang.org/grpc"
 
 	"github.com/Elissbar/go-shortener-url/internal/logger"
 	"github.com/Elissbar/go-shortener-url/internal/observer"
@@ -85,18 +87,33 @@ func main() {
 		},
 		Handler: httpHandler.NewHandler(srvc).Router(),
 	}
+	serviceServer := grpcHandler.NewShortenerServer(srvc)
+	grpcServer := grpc.NewServer(
+		grpc.UnaryInterceptor(serviceServer.AuthInterceptor),
+	)
 
 	g, gCtx := errgroup.WithContext(shutdownCtx)
 	g.Go(func() error {
+		listen, err := net.Listen("tcp", srvc.Config.AddrGRPC)
+		if err != nil {
+			return fmt.Errorf("ошибка при инициализации listener: %w", err)
+		}
+
+		grpcHandler.RegisterShortenerServiceServer(grpcServer, serviceServer)
+		log.Infof("gRPC server starts on %s", srvc.Config.AddrGRPC)
+		if err := grpcServer.Serve(listen); err != nil {
+			return fmt.Errorf("ошибка при инициализации listener: %w", err)
+		}
+		return nil
+	})
+	g.Go(func() error {
 		if cfg.EnableHTTPS != nil && (*cfg.EnableHTTPS) {
-			log.Infof("🚀 HTTPS mode. Server started on %s", cfg.ServerURL)
-			// err = http.ListenAndServeTLS(srvc.Config.ServerURL, "cert.pem", "key.pem", myHandler.Router())
+			log.Infof("HTTPS mode. Server started on %s", cfg.ServerURL)
 			if err := httpServer.ListenAndServeTLS("cert.pem", "key.pem"); err != nil && err != http.ErrServerClosed {
 				return fmt.Errorf("server error: %w", err)
 			}
 		} else {
-			log.Infof("🚀 HTTP mode. Server started on %s", cfg.ServerURL)
-			// err = http.ListenAndServe(srvc.Config.ServerURL, myHandler.Router())
+			log.Infof("HTTP mode. Server started on %s", cfg.ServerURL)
 			if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 				return fmt.Errorf("server error: %w", err)
 			}
@@ -113,6 +130,7 @@ func main() {
 		if err := httpServer.Shutdown(ctx); err != nil {
 			return fmt.Errorf("shutdown error: %w", err)
 		}
+		grpcServer.GracefulStop()
 		close(srvc.DeleteCh)
 
 		log.Info("Server stopped")
