@@ -57,7 +57,7 @@ func (h *MyHandler) GetRoot(rw http.ResponseWriter, req *http.Request) {
 
 func (h *MyHandler) GetStats(rw http.ResponseWriter, req *http.Request) {
 	if h.Service.Config.TrustedSubnet == "" {
-		rw.WriteHeader(http.StatusUnauthorized)
+		rw.WriteHeader(http.StatusForbidden)
 		return
 	}
 

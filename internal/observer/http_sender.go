@@ -27,8 +27,12 @@ func (h *HTTPSubscriber) Update(message model.AuditRequest) error {
 	}
 
 	resp, err := client.Do(req)
-	resp.Body.Close()
-	return err
+	if err != nil {
+		return fmt.Errorf("error do http request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	return nil
 }
 
 func (h *HTTPSubscriber) GetID() string {

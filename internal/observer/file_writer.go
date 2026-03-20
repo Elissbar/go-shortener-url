@@ -18,6 +18,7 @@ func (fs *FileSubscriber) Update(message model.AuditRequest) error {
 	if err != nil {
 		return fmt.Errorf("error opening file for subscriber: %w", err)
 	}
+	defer f.Close()
 
 	data, err := json.Marshal(message)
 	if err != nil {
@@ -25,7 +26,6 @@ func (fs *FileSubscriber) Update(message model.AuditRequest) error {
 	}
 
 	if _, err := f.WriteString(string(data)); err != nil {
-		f.Close()
 		return fmt.Errorf("error writing file for subscriber: %w", err)
 	}
 	return nil
