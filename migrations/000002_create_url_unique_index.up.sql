@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX ind_url_unique ON shorted_links (url);

@@ -1,15 +1,55 @@
 package main
 
 import (
+	"context"
+	"fmt"
+	"net"
 	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
-	"github.com/Elissbar/go-shortener-url/internal/handler"
+	// "os"
+	"reflect"
+
+	"github.com/Elissbar/go-shortener-url/internal/config"
+	grpcHandler "github.com/Elissbar/go-shortener-url/internal/handler/grpc"
+	httpHandler "github.com/Elissbar/go-shortener-url/internal/handler/http"
+	"google.golang.org/grpc"
+
 	"github.com/Elissbar/go-shortener-url/internal/logger"
+	"github.com/Elissbar/go-shortener-url/internal/observer"
 	"github.com/Elissbar/go-shortener-url/internal/repository/patterns"
+	"github.com/Elissbar/go-shortener-url/internal/service"
+	"golang.org/x/sync/errgroup"
+	// _ "net/http/pprof"
 )
 
+var (
+	buildVersion string = "N/A"
+	buildDate    string = "N/A"
+	buildCommit  string = "N/A"
+)
+
+// @title Shortener URL API
+// @host localhost:8080
+// @schemes http
+// @BasePath /
 func main() {
-	cfg, err := parseFlags()
+	// для запуска pprof на отдельном порту
+	// go func() {
+	//     http.ListenAndServe("localhost:6060", nil)
+	// }()
+
+	shutdownCtx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT, syscall.SIGQUIT)
+	defer stop()
+
+	fmt.Printf("Build version: %s\n", buildVersion)
+	fmt.Printf("Build date: %s\n", buildDate)
+	fmt.Printf("Build commit: %s\n", buildCommit)
+
+	cfg, err := config.NewConfig()
 	if err != nil {
 		panic(err)
 	}
@@ -20,22 +60,87 @@ func main() {
 	}
 	defer log.Sync()
 
-	storage, err := patterns.NewStorage(cfg)
+	storage, err := patterns.NewStorage(log, cfg.DatabaseAdr, cfg.FileStoragePath)
 	if err != nil {
 		panic(err)
 	}
-	defer storage.Close()
+	log.Infow("Storage type:", "type", reflect.TypeOf(storage))
 
-	myHandler := &handler.MyHandler{
-		Storage: storage,
-		Config:  cfg,
-		Logger:  log,
+	event := observer.NewEvent()
+	if cfg.AuditFile != "" {
+		event.Subscribe(&observer.FileSubscriber{ID: "FileSub", FilePath: cfg.AuditFile})
+		log.Infow("Registered file audit. Audit file: " + cfg.AuditFile)
+	}
+	if cfg.AuditURL != "" {
+		event.Subscribe(&observer.HTTPSubscriber{ID: "HTTPSub", URL: cfg.AuditURL})
+		log.Infow("Registered http auditt. URL for audit: " + cfg.AuditURL)
 	}
 
-	router := myHandler.Router()
+	srvc := service.NewService(cfg, log, storage, event)
+	defer srvc.Helper.Close()
+	go srvc.ProcessDeletions(shutdownCtx)
 
-	err = http.ListenAndServe(cfg.ServerURL, router)
-	if err != nil {
-		panic(err)
+	httpServer := &http.Server{
+		Addr: cfg.ServerURL,
+		BaseContext: func(_ net.Listener) context.Context {
+			return shutdownCtx
+		},
+		Handler: httpHandler.NewHandler(srvc).Router(),
 	}
+	serviceServer := grpcHandler.NewShortenerServer(srvc)
+	grpcServer := grpc.NewServer(
+		grpc.UnaryInterceptor(serviceServer.AuthInterceptor),
+	)
+
+	g, gCtx := errgroup.WithContext(shutdownCtx)
+	g.Go(func() error {
+		listen, err := net.Listen("tcp", srvc.Config.AddrGRPC)
+		if err != nil {
+			return fmt.Errorf("ошибка при инициализации listener: %w", err)
+		}
+
+		grpcHandler.RegisterShortenerServiceServer(grpcServer, serviceServer)
+		log.Infof("gRPC server starts on %s", srvc.Config.AddrGRPC)
+		if err := grpcServer.Serve(listen); err != nil {
+			return fmt.Errorf("ошибка при инициализации listener: %w", err)
+		}
+		return nil
+	})
+	g.Go(func() error {
+		if cfg.EnableHTTPS != nil && (*cfg.EnableHTTPS) {
+			log.Infof("HTTPS mode. Server started on %s", cfg.ServerURL)
+			if err := httpServer.ListenAndServeTLS("cert.pem", "key.pem"); err != nil && err != http.ErrServerClosed {
+				return fmt.Errorf("server error: %w", err)
+			}
+		} else {
+			log.Infof("HTTP mode. Server started on %s", cfg.ServerURL)
+			if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+				return fmt.Errorf("server error: %w", err)
+			}
+		}
+		return nil
+	})
+	g.Go(func() error {
+		<-gCtx.Done()
+		srvc.Logger.Info("Shutting down server...")
+
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+		defer cancel()
+
+		if err := httpServer.Shutdown(ctx); err != nil {
+			return fmt.Errorf("shutdown error: %w", err)
+		}
+		grpcServer.GracefulStop()
+		close(srvc.DeleteCh)
+
+		log.Info("Server stopped")
+		return nil
+	})
+
+	if err := g.Wait(); err != nil {
+		srvc.Logger.Errorf("Application error: %v", err)
+		os.Exit(1)
+	}
+
+	log.Info("Application stopped")
 }

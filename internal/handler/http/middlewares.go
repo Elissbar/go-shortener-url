@@ -2,9 +2,13 @@ package handler
 
 import (
 	"compress/gzip"
+	"context"
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/Elissbar/go-shortener-url/internal/handler/common"
+	"go.uber.org/zap"
 )
 
 // Кастомный ResponseWriter для gzip
@@ -20,7 +24,7 @@ func gzipMiddleware(next http.Handler) http.Handler {
 		// Проверяем поддержку gzip клиентом
 		if strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
 			gw := &gzipResponseWriter{
-				Writer:             gzip.NewWriter(w),
+				Writer:         gzip.NewWriter(w),
 				ResponseWriter: w,
 			}
 			defer gw.Writer.Close()
@@ -70,30 +74,62 @@ func ungzipMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-func (h *MyHandler) LoggingMiddleware(handler http.Handler) http.Handler {
-	logFn := func(w http.ResponseWriter, r *http.Request) {
-		startTime := time.Now()
+func loggingMiddleware(log *zap.SugaredLogger) func(handler http.Handler) http.Handler {
+	return func(handler http.Handler) http.Handler {
+		logFn := func(w http.ResponseWriter, req *http.Request) {
+			startTime := time.Now()
 
-		uri := r.RequestURI
-		metnod := r.Method
+			uri := req.RequestURI
+			metnod := req.Method
 
-		lw := responseWriter{
-			ResponseWriter: w,
-			responseData:   &responseData{},
+			lw := responseWriter{
+				ResponseWriter: w,
+				responseData:   &responseData{},
+			}
+
+			handler.ServeHTTP(&lw, req)
+
+			duration := time.Since(startTime)
+
+			log.Infow("Request/Response data: ",
+				"uri", uri,
+				"method", metnod,
+				"status", lw.responseData.status,
+				"duration", int(duration),
+				"size", lw.responseData.size,
+			)
 		}
 
-		handler.ServeHTTP(&lw, r)
-
-		duration := time.Since(startTime)
-
-		h.Logger.Infow("Request/Response data: ",
-			"uri", uri,
-			"method", metnod,
-			"status", lw.responseData.status,
-			"duration", int(duration),
-			"size", lw.responseData.size,
-		)
+		return http.HandlerFunc(logFn)
 	}
+}
 
-	return http.HandlerFunc(logFn)
+func authentication(jwtSecret string) func(handler http.Handler) http.Handler {
+	return func(handler http.Handler) http.Handler {
+		authFn := func(w http.ResponseWriter, req *http.Request) {
+			var userID string
+			cookie, err := req.Cookie("user_id")
+
+			if err != nil || cookie.Value == "" {
+				cookie, userIDStr, err := common.GenerateAuthToken(jwtSecret)
+				if err != nil {
+					http.Error(w, "Authorization required", http.StatusUnauthorized)
+					return
+				}
+				userID = userIDStr
+				http.SetCookie(w, cookie)
+			} else {
+				userID, err = common.VerifyAuthToken(cookie.Value, jwtSecret)
+				if err != nil {
+					http.Error(w, "Invalid token", http.StatusUnauthorized)
+					return
+				}
+			}
+
+			ctx := context.WithValue(req.Context(), common.UserIDKey, userID)
+			handler.ServeHTTP(w, req.WithContext(ctx))
+		}
+
+		return http.HandlerFunc(authFn)
+	}
 }
